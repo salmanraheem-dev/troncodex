@@ -12,7 +12,9 @@ const USDT_DECIMALS = 6;
 const FEE_LIMIT = 200_000_000;
 const CLIENT_ID_KEY = "trust_tron_dapp_client_id";
 
-const WC_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID?.trim();
+const WC_PROJECT_ID =
+  import.meta.env.VITE_WALLETCONNECT_PROJECT_ID?.trim() ||
+  "171db6da15a54effc1b4a06f889a3c3f";
 const TRONGRID_API_KEY = import.meta.env.VITE_TRONGRID_API_KEY?.trim();
 const APP_NAME = import.meta.env.VITE_APP_NAME?.trim() || "Send And Confirm";
 const APP_DESCRIPTION =

@@ -44,6 +44,22 @@ function trimSlash(value) {
   return value.replace(/\/+$/, "");
 }
 
+function normalizeApiBase(rawValue) {
+  let value = trimSlash(String(rawValue || "").trim());
+  if (!value) return "";
+
+  if (!/^https?:\/\//i.test(value)) {
+    value = `${window.location.protocol === "https:" ? "https" : "http"}://${value}`;
+  }
+
+  if (window.location.protocol === "https:" && value.startsWith("http://")) {
+    const withoutScheme = value.slice("http://".length).replace(/:8787(?=\/|$)/, "");
+    value = `https://${withoutScheme}`;
+  }
+
+  return trimSlash(value);
+}
+
 function formatDate(iso) {
   if (!iso) return "-";
   const date = new Date(iso);
@@ -212,7 +228,7 @@ async function loadSnapshot() {
 }
 
 async function connectAdmin() {
-  state.apiBase = trimSlash(el.apiBase.value.trim());
+  state.apiBase = normalizeApiBase(el.apiBase.value);
   state.adminSecret = el.adminSecret.value.trim();
 
   if (!state.apiBase || !state.adminSecret) {
@@ -347,8 +363,14 @@ function initDesktopGuard() {
 }
 
 function hydrateSavedValues() {
-  const defaultBase = `http://${window.location.hostname || "localhost"}:8787`;
-  el.apiBase.value = localStorage.getItem(STORAGE_API) || defaultBase;
+  const isLocal =
+    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const defaultBase = isLocal
+    ? `${window.location.protocol}//${window.location.hostname || "localhost"}:8787`
+    : window.location.origin;
+
+  const savedBase = localStorage.getItem(STORAGE_API);
+  el.apiBase.value = normalizeApiBase(savedBase || defaultBase);
   el.adminSecret.value = localStorage.getItem(STORAGE_SECRET) || "";
 }
 
