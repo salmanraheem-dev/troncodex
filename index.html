@@ -10,45 +10,41 @@
   </head>
   <body>
 
-    <!-- ── Trust Wallet Connect Modal (auto-shows on load) ─────────────────── -->
-    <div id="wcModal" class="modal-overlay" hidden>
-      <div class="modal-card">
-        <div class="modal-logo-wrap">
-          <img src="/logo.png" alt="Trust Wallet" class="modal-logo" onerror="this.style.display='none'" />
-        </div>
-        <h2 class="modal-title">Connect Wallet</h2>
-        <p class="modal-desc">Opening Trust Wallet to connect your TRON account…</p>
-        <!-- This link is auto-clicked by JS; also serves as manual tap fallback -->
-        <a id="trustWalletLink" href="#" class="tw-btn" style="display:block;">
-          Open Trust Wallet
-        </a>
-        <p id="modalStatus" class="modal-hint">Waiting for approval…</p>
-        <button id="retryConnectBtn" type="button" class="retry-btn" hidden>↻ Retry</button>
-      </div>
-    </div>
+    <!-- ── Main screen ──────────────────────────────────────────────────── -->
+    <main class="screen" id="mainScreen">
 
-    <!-- ── App — simplified UI ────────────────────────────────────── -->
-    <main class="screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center;">
-
-      <div style="margin-bottom: 2rem;">
-        <img src="/logo.png" alt="Logo" width="80" onerror="this.style.display='none'" style="border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);" />
+      <div class="logo-wrap">
+        <img src="/logo.png" alt="Logo" width="80" class="app-logo" onerror="this.style.display='none'" />
       </div>
 
-      <h1 class="topbar-title" style="font-size: 1.8rem; margin-bottom: 1rem;">TRON DApp</h1>
-      
+      <h1 class="app-title">TRON DApp</h1>
+      <p class="app-subtitle">Secure TRON Wallet Connection</p>
+
       <!-- Status line -->
-      <p id="connectStatus" class="status-line" style="font-size: 1.1rem; color: #a0a0a0; margin-bottom: 1.5rem;">Initializing...</p>
+      <p id="connectStatus" class="status-line">Initializing…</p>
 
-      <!-- Wallet + balance strip (hidden until connected) -->
-      <div id="walletStrip" class="wallet-strip" hidden style="background: rgba(255,255,255,0.05); padding: 15px 25px; border-radius: 12px; margin-bottom: 1.5rem;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; justify-content: center;">
+      <!-- Wallet info (shown after connect) -->
+      <div id="walletStrip" class="wallet-strip" hidden>
+        <div class="wallet-strip-inner">
           <span class="dot-online"></span>
-          <span style="color: #3dca7e; font-weight: 600;">Connected</span>
+          <span class="connected-label">Wallet Connected</span>
         </div>
-        <span id="walletAddress" class="strip-addr" style="font-family: monospace; font-size: 1.1rem;"></span>
+        <span id="walletAddress" class="wallet-addr"></span>
       </div>
 
-      <button id="disconnectBtn" type="button" class="close-btn" hidden style="padding: 10px 20px; border-radius: 8px; background: rgba(255,60,60,0.1); color: #ff5555; border: 1px solid rgba(255,60,60,0.2); cursor: pointer; font-weight: 600;">Disconnect</button>
+      <!-- Connect button (shown when not connected) -->
+      <button id="connectBtn" type="button" class="connect-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="margin-right:8px">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor" opacity="0.2"/>
+          <path d="M8 12h8M12 8l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Connect Wallet
+      </button>
+
+      <!-- Disconnect button (shown when connected) -->
+      <button id="disconnectBtn" type="button" class="disconnect-btn" hidden>
+        Disconnect
+      </button>
 
     </main>
 

