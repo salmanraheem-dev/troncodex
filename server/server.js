@@ -11,7 +11,7 @@ import { WebSocketServer, WebSocket } from "ws";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = Number(process.env.ADMIN_SERVER_PORT || 8787);
+const PORT = Number(process.env.PORT || process.env.ADMIN_SERVER_PORT || 8787);
 const ADMIN_SECRET = (process.env.ADMIN_SECRET || "change-this-admin-secret").trim();
 const MAX_REQUESTS = 500;
 const MAX_EVENTS = 300;
