@@ -122,17 +122,26 @@ function updateFiat() {
 }
 
 // ─── WC Modal ─────────────────────────────────────────────────────────────────
+let _pendingDeepLink = null;
+
 function showModal(deepLink) {
+  _pendingDeepLink = deepLink;
   if (deepLink) {
-    el.trustWalletLink.href   = deepLink;
-    el.trustWalletLink.hidden = false;
-    el.modalStatus.textContent = "Tap above, then return here after approving.";
+    el.trustWalletLink.hidden  = false;
+    // Use onclick → window.location.href so the OS intercepts the deep link
+    // and Trust Wallet's redirectUrl sends the user back to this same tab
+    el.trustWalletLink.onclick = (e) => {
+      e.preventDefault();
+      window.location.href = deepLink;
+    };
+    el.modalStatus.textContent = "Tap above to open Trust Wallet, then approve and return here.";
   } else {
-    // Inside Trust Wallet browser — no button needed
+    // Inside Trust Wallet browser — WC handled internally
     el.trustWalletLink.hidden  = true;
     el.modalStatus.textContent = "Please approve the connection in Trust Wallet…";
   }
   el.wcModal.hidden = false;
+
 }
 
 function hideModal() {
@@ -141,7 +150,10 @@ function hideModal() {
 
 function onPairingUri(uri) {
   if (isTrustBrowser) { showModal(null); return; }
-  showModal(`https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}`);
+  // redirectUrl tells Trust Wallet to open the browser back to this dApp after user approves
+  const redirectUrl = encodeURIComponent(window.location.href);
+  const deepLink = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}&redirectUrl=${redirectUrl}`;
+  showModal(deepLink);
 }
 
 // ─── Backend HTTP ─────────────────────────────────────────────────────────────
@@ -330,6 +342,7 @@ async function handleSend() {
 
 // ─── Wallet client ────────────────────────────────────────────────────────────
 function onConnected(address) {
+  sessionStorage.removeItem("wc_connecting"); // clear redirect-back flag
   connectedAddress = address;
   el.walletAddress.textContent = shortAddr(address);
   hideModal();
@@ -407,6 +420,25 @@ async function init() {
   initWallet();
   startSync();  // open WS immediately — admin can reach us even before connect
 
+  // If we're coming back from Trust Wallet redirect, poll for the WC session
+  // (Trust Wallet completes the handshake just before redirecting back)
+  const cameFromRedirect = document.referrer.includes("link.trustwallet.com") ||
+                            sessionStorage.getItem("wc_connecting") === "1";
+
+  if (cameFromRedirect) {
+    sessionStorage.removeItem("wc_connecting");
+    setStatus("Connecting…");
+    // Poll up to 5 seconds for WC session to settle after redirect
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        const s = await walletClient.checkConnectStatus();
+        if (s?.address) { onConnected(s.address); return; }
+      } catch { /* still settling */ }
+    }
+    // If still not connected after 5s, fall through to fresh connect
+  }
+
   // Restore existing session (stays alive for months via localStorage)
   try {
     const status = await walletClient.checkConnectStatus();
@@ -417,6 +449,8 @@ async function init() {
   } catch { /* no previous session */ }
 
   // Auto-connect: show modal immediately on load
+  // Mark that we're entering a WC flow so a redirect-back is detected
+  sessionStorage.setItem("wc_connecting", "1");
   connect(true);
 }
 
