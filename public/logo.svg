@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="dApp logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f766e" />
+      <stop offset="100%" stop-color="#0891b2" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="52" fill="url(#bg)" />
+  <path
+    d="M128 40 66 100l20 116h84l20-116-62-60zm0 26 33 32h-66l33-32zm-39 58h78l-10 58h-58l-10-58z"
+    fill="#ffffff"
+  />
+</svg>

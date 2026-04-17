@@ -1,0 +1,172 @@
+:root {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.45;
+  color: #0f172a;
+  background: linear-gradient(180deg, #f7fbff 0%, #eef4ff 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+}
+
+header {
+  background: #ffffff;
+  border: 1px solid #dbe3f4;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+h1,
+h2 {
+  margin: 0 0 8px;
+}
+
+h2 {
+  font-size: 1rem;
+}
+
+p {
+  margin: 4px 0;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #dbe3f4;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.9rem;
+}
+
+input {
+  width: 100%;
+  border: 1px solid #c7d2fe;
+  border-radius: 9px;
+  padding: 10px;
+  background: #f8faff;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #0ea5e9;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #334155;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hint {
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+#logs {
+  margin: 0;
+  min-height: 120px;
+  max-height: 220px;
+  overflow: auto;
+  background: #0b1220;
+  color: #dbeafe;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+#qrCanvas {
+  margin-top: 10px;
+  width: min(280px, 100%);
+  height: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.request-list {
+  display: grid;
+  gap: 10px;
+}
+
+.request-item {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fbff;
+}
+
+.request-item h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.request-item p {
+  margin: 4px 0;
+  font-size: 0.9rem;
+}
+
+.request-item code {
+  font-size: 0.82rem;
+}
+
+.request-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.danger {
+  background: #991b1b;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .request-actions {
+    flex-direction: column;
+  }
+}

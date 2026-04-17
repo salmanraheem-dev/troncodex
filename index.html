@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="apple-touch-icon" href="/logo.svg" />
+    <title>Trust Wallet TRON dApp</title>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>Trust Wallet + TRON</h1>
+        <p>Mobile-only TRON dApp flow (WalletConnect + TRON transactions)</p>
+      </header>
+
+      <section class="card">
+        <h2>Connection</h2>
+        <p id="environment"></p>
+        <p id="status">Initializing...</p>
+        <p id="wallet"></p>
+        <div class="actions">
+          <button id="connectBtn" type="button">Connect Trust Wallet</button>
+          <button id="disconnectBtn" type="button" class="secondary">Disconnect</button>
+        </div>
+        <p id="pairingHint" class="hint"></p>
+        <canvas id="qrCanvas" hidden></canvas>
+      </section>
+
+      <section class="card">
+        <h2>TRX Transfer</h2>
+        <div class="grid">
+          <label>
+            To Address
+            <input id="trxTo" placeholder="T..." />
+          </label>
+          <label>
+            Amount (TRX)
+            <input id="trxAmount" placeholder="1.5" />
+          </label>
+        </div>
+        <button id="sendTrxBtn" type="button">Send TRX</button>
+      </section>
+
+      <section class="card">
+        <h2>TRC20 Approve</h2>
+        <div class="grid">
+          <label>
+            Token Contract
+            <input id="approveToken" placeholder="TRC20 contract address" />
+          </label>
+          <label>
+            Spender Address
+            <input id="approveSpender" placeholder="T..." />
+          </label>
+          <label>
+            Amount
+            <input id="approveAmount" placeholder="100.0" />
+          </label>
+          <label>
+            Token Decimals
+            <input id="approveDecimals" value="6" />
+          </label>
+        </div>
+        <button id="approveBtn" type="button">Approve</button>
+      </section>
+
+      <section class="card">
+        <h2>TRC20 Transfer</h2>
+        <div class="grid">
+          <label>
+            Token Contract
+            <input id="tokenTransferContract" placeholder="TRC20 contract address" />
+          </label>
+          <label>
+            To Address
+            <input id="tokenTransferTo" placeholder="T..." />
+          </label>
+          <label>
+            Amount
+            <input id="tokenTransferAmount" placeholder="25.0" />
+          </label>
+          <label>
+            Token Decimals
+            <input id="tokenTransferDecimals" value="6" />
+          </label>
+        </div>
+        <button id="transferTokenBtn" type="button">Transfer Token</button>
+      </section>
+
+      <section class="card">
+        <h2>Admin Requests (User Approval Required)</h2>
+        <p id="backendStatus">Backend: not connected</p>
+        <div id="adminRequests"></div>
+      </section>
+
+      <section class="card">
+        <h2>Logs</h2>
+        <pre id="logs"></pre>
+      </section>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+  </html>

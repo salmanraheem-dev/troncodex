@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TRON dApp Admin</title>
+    <link rel="stylesheet" href="/admin/admin.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="card">
+        <h1>TRON dApp Admin</h1>
+        <p>Desktop-only dashboard. Every blockchain action still requires user approval in wallet.</p>
+      </header>
+
+      <section class="card" id="mobileBlock" hidden>
+        <h2>Blocked</h2>
+        <p>This admin page is desktop/laptop only.</p>
+      </section>
+
+      <section class="card">
+        <h2>Connection</h2>
+        <div class="grid2">
+          <label>
+            API Base URL
+            <input id="apiBase" placeholder="http://localhost:8787" />
+          </label>
+          <label>
+            Admin Secret
+            <input id="adminSecret" type="password" placeholder="ADMIN_SECRET from .env" />
+          </label>
+        </div>
+        <div class="row">
+          <button id="connectBtn" type="button">Connect Admin</button>
+          <button id="refreshBtn" type="button" class="secondary">Refresh</button>
+        </div>
+        <p id="status">Not connected</p>
+      </section>
+
+      <section class="card">
+        <h2>Connected Wallets</h2>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Client ID</th>
+                <th>Address</th>
+                <th>Status</th>
+                <th>Last Seen</th>
+              </tr>
+            </thead>
+            <tbody id="walletRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Create Request</h2>
+        <form id="requestForm">
+          <div class="grid2">
+            <label>
+              Wallet Session
+              <select id="walletSelect"></select>
+            </label>
+            <label>
+              Request Type
+              <select id="requestType">
+                <option value="send_trx">TRX Send</option>
+                <option value="trc20_transfer">TRC20 Transfer</option>
+                <option value="trc20_approve">TRC20 Approve</option>
+              </select>
+            </label>
+            <label>
+              To Address
+              <input id="toAddress" placeholder="T..." />
+            </label>
+            <label>
+              Token Contract
+              <input id="tokenAddress" placeholder="TRC20 contract (for token actions)" />
+            </label>
+            <label>
+              Spender Address
+              <input id="spenderAddress" placeholder="Required for approve" />
+            </label>
+            <label>
+              Amount
+              <input id="amountValue" placeholder="Example: 1.25" />
+            </label>
+            <label>
+              Decimals
+              <input id="decimalsValue" value="6" />
+            </label>
+            <label>
+              Note
+              <input id="requestNote" placeholder="Optional admin note" />
+            </label>
+          </div>
+          <button type="submit">Send Request To User</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Request Log</h2>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Created</th>
+                <th>Type</th>
+                <th>Address</th>
+                <th>Status</th>
+                <th>TxID</th>
+                <th>Error</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody id="requestRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Events</h2>
+        <pre id="eventsBox"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="/admin/admin.js"></script>
+  </body>
+  </html>
