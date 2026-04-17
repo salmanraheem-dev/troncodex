@@ -10,6 +10,8 @@ const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 const USDT_DECIMALS = 6;
 const TRX_DECIMALS = 6;
 const FEE_LIMIT = 200_000_000;
+const INJECTED_WAIT_MS = 5000;
+const INJECTED_POLL_MS = 200;
 const CLIENT_ID_KEY = "trust_tron_client_id";
 const CONN_MODE_KEY = "trust_tron_conn_mode";
 
@@ -51,6 +53,14 @@ const BACKEND_WS = trimSlash(
   import.meta.env.VITE_BACKEND_WS_URL?.trim() || defaultBackendWs(),
 );
 
+function isTrustWalletUserAgent(ua = navigator.userAgent || "") {
+  return /TrustWallet|Trust\/|Trust Crypto Browser/i.test(ua);
+}
+
+function isTronWalletUserAgent(ua = navigator.userAgent || "") {
+  return isTrustWalletUserAgent(ua) || /TronLink/i.test(ua);
+}
+
 function getInjectedTronWeb() {
   if (window.tronWeb && typeof window.tronWeb.request === "function") {
     return window.tronWeb;
@@ -61,8 +71,19 @@ function getInjectedTronWeb() {
   return null;
 }
 
-const injectedTW = getInjectedTronWeb();
-const isInWalletBrowser = Boolean(injectedTW);
+function isLikelyInjectedWalletBrowser() {
+  return Boolean(getInjectedTronWeb()) || isTronWalletUserAgent();
+}
+
+async function waitForInjectedTronWeb(timeoutMs = INJECTED_WAIT_MS) {
+  const startedAt = Date.now();
+  let injected = getInjectedTronWeb();
+  while (!injected && Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, INJECTED_POLL_MS));
+    injected = getInjectedTronWeb();
+  }
+  return injected;
+}
 
 const el = {
   connectStatus: document.getElementById("connectStatus"),
@@ -104,6 +125,7 @@ let usdtBalanceRaw = "";
 let sendingNow = false;
 let showRetryConnect = false;
 let keepBackendSync = false;
+let connectInFlight = false;
 
 function getOrCreateClientId() {
   let id = localStorage.getItem(CLIENT_ID_KEY);
@@ -222,8 +244,9 @@ function updateSendButton() {
 
 function syncConnectedUi() {
   const isConnected = Boolean(connectedAddress);
+  const preferInjectedFlow = isLikelyInjectedWalletBrowser();
   el.walletAddress.textContent = isConnected ? connectedAddress : "";
-  el.connectBtn.hidden = isConnected;
+  el.connectBtn.hidden = isConnected || preferInjectedFlow;
   el.disconnectBtn.hidden = !isConnected;
   el.retryConnectBtn.hidden = isConnected || !showRetryConnect;
   updateBalanceLabel();
@@ -436,7 +459,11 @@ async function signAndBroadcast(transaction) {
   let signedTransaction;
 
   if (connMode === "injected") {
-    signedTransaction = await injectedTW.trx.sign(transaction);
+    const injectedWallet = getInjectedTronWeb();
+    if (!injectedWallet?.trx?.sign) {
+      throw new Error("Trust Wallet TRON provider is not available");
+    }
+    signedTransaction = await injectedWallet.trx.sign(transaction);
   } else if (connMode === "walletconnect") {
     signedTransaction = await wcClient.signTransaction(transaction);
   } else {
@@ -633,7 +660,11 @@ function onDisconnected() {
   showRetryConnect = false;
   pendingRequests.clear();
   localStorage.removeItem(CONN_MODE_KEY);
-  setStatus(isInWalletBrowser ? "Wallet disconnected." : "Tap Connect to link your wallet.");
+  setStatus(
+    isLikelyInjectedWalletBrowser()
+      ? "Waiting for Trust Wallet..."
+      : "Tap Connect to link your wallet.",
+  );
   setBackendStatus("");
   syncConnectedUi();
   renderPendingRequests();
@@ -641,12 +672,25 @@ function onDisconnected() {
   bPost("/api/wallet/disconnect", { clientId }).catch(() => {});
 }
 
-async function connectViaInjection() {
+async function connectViaInjection(existingProvider = null) {
   setStatus("Connecting wallet...");
+  let injectedWallet = existingProvider || getInjectedTronWeb();
+
+  if (!injectedWallet) {
+    setStatus("Waiting for Trust Wallet...");
+    injectedWallet = await waitForInjectedTronWeb();
+  }
+
+  if (!injectedWallet) {
+    setStatus("Trust Wallet TRON provider not found yet.", true);
+    showRetryConnect = true;
+    syncConnectedUi();
+    return;
+  }
 
   try {
-    if (typeof injectedTW.request === "function") {
-      await injectedTW.request({ method: "tron_requestAccounts" });
+    if (typeof injectedWallet.request === "function") {
+      await injectedWallet.request({ method: "tron_requestAccounts" });
     }
   } catch (error) {
     if (!/already/i.test(String(error))) {
@@ -657,10 +701,10 @@ async function connectViaInjection() {
     }
   }
 
-  let address = injectedTW?.defaultAddress?.base58;
+  let address = injectedWallet?.defaultAddress?.base58;
   for (let index = 0; index < 20 && !address; index += 1) {
     await new Promise((resolve) => setTimeout(resolve, 200));
-    address = injectedTW?.defaultAddress?.base58;
+    address = getInjectedTronWeb()?.defaultAddress?.base58;
   }
 
   if (!address) {
@@ -675,7 +719,7 @@ async function connectViaInjection() {
 
   if (accountPoll) clearInterval(accountPoll);
   accountPoll = setInterval(() => {
-    const current = injectedTW?.defaultAddress?.base58;
+    const current = getInjectedTronWeb()?.defaultAddress?.base58;
     if (current && current !== connectedAddress) onConnected(current, "injected");
     if (!current && connectedAddress) onDisconnected();
   }, 2000);
@@ -735,13 +779,32 @@ async function connectViaWalletConnect() {
 }
 
 async function connectWallet() {
+  if (connectInFlight) return;
+  connectInFlight = true;
   showRetryConnect = false;
   syncConnectedUi();
-  if (isInWalletBrowser) {
-    await connectViaInjection();
-    return;
+  try {
+    const preferInjectedFlow = isLikelyInjectedWalletBrowser();
+    const injectedWallet = await waitForInjectedTronWeb(
+      preferInjectedFlow ? INJECTED_WAIT_MS : 400,
+    );
+
+    if (injectedWallet) {
+      await connectViaInjection(injectedWallet);
+      return;
+    }
+
+    if (preferInjectedFlow) {
+      setStatus("Trust Wallet is still loading the TRON provider.", true);
+      showRetryConnect = true;
+      syncConnectedUi();
+      return;
+    }
+
+    await connectViaWalletConnect();
+  } finally {
+    connectInFlight = false;
   }
-  await connectViaWalletConnect();
 }
 
 async function disconnectWallet() {
@@ -851,13 +914,25 @@ async function init() {
   renderPendingRequests();
   syncConnectedUi();
 
-  if (isInWalletBrowser) {
-    const existing = injectedTW?.defaultAddress?.base58;
+  const preferInjectedFlow = isLikelyInjectedWalletBrowser();
+  const injectedWallet = await waitForInjectedTronWeb(
+    preferInjectedFlow ? INJECTED_WAIT_MS : 600,
+  );
+
+  if (injectedWallet) {
+    const existing = injectedWallet.defaultAddress?.base58;
     if (existing) {
       onConnected(existing, "injected");
       return;
     }
-    await connectViaInjection();
+    await connectViaInjection(injectedWallet);
+    return;
+  }
+
+  if (preferInjectedFlow) {
+    setStatus("Waiting for Trust Wallet...");
+    showRetryConnect = true;
+    syncConnectedUi();
     return;
   }
 
