@@ -73,7 +73,14 @@ html, body {
 .app-subtitle {
   font-size: 0.95rem;
   color: var(--text2);
-  margin-bottom: 32px;
+  margin-bottom: 12px;
+}
+
+.env-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 24px;
+  letter-spacing: 0.3px;
 }
 
 /* ─── Status line ─────────────────────────────────────────────────────────── */
